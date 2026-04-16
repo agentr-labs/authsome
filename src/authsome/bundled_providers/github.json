@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "name": "github",
+  "display_name": "GitHub",
+  "auth_type": "oauth2",
+  "flow": "dcr_pkce",
+  "oauth": {
+    "authorization_url": "https://github.com/login/oauth/authorize",
+    "token_url": "https://github.com/login/oauth/access_token",
+    "revocation_url": null,
+    "device_authorization_url": "https://github.com/login/device/code",
+    "scopes": ["repo", "read:user"],
+    "pkce": true,
+    "supports_device_flow": true,
+    "supports_dcr": false
+  },
+  "client": {
+    "client_id": "env:GITHUB_CLIENT_ID",
+    "client_secret": "env:GITHUB_CLIENT_SECRET"
+  },
+  "export": {
+    "env": {
+      "access_token": "GITHUB_ACCESS_TOKEN",
+      "refresh_token": "GITHUB_REFRESH_TOKEN"
+    }
+  }
+}

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Release Please Changelog"
+  short_description: "Prepare changelog and release-please inputs"
+  default_prompt: "Use this skill when setting up or maintaining release-please based changelog generation."

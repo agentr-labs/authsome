@@ -1,18 +1,17 @@
 """Tests for the provider registry."""
 
-import json
-import pytest
 from pathlib import Path
 
+import pytest
+
+from authsome.errors import InvalidProviderSchemaError, ProviderNotFoundError
 from authsome.models.enums import AuthType, FlowType
 from authsome.models.provider import (
     ApiKeyConfig,
-    ExportConfig,
     OAuthConfig,
     ProviderDefinition,
 )
 from authsome.providers.registry import ProviderRegistry
-from authsome.errors import InvalidProviderSchemaError, ProviderNotFoundError
 
 
 def _make_api_key_provider(name: str = "testprov") -> ProviderDefinition:
@@ -59,7 +58,7 @@ class TestProviderRegistry:
         names = [p.name for p in providers]
         # Our bundled providers should be present
         assert "openai" in names
-        assert "anthropic" in names
+        assert "github" in names
 
     def test_get_bundled_provider(self, registry: ProviderRegistry) -> None:
         provider = registry.get_provider("openai")

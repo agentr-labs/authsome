@@ -8,9 +8,10 @@ version = "0.1.0"
 description = "A portable local authentication library for AI agents and developer tools"
 readme = "README.md"
 license = "MIT"
-requires-python = ">=3.10"
+license-files = ["LICENSE"]
+requires-python = ">=3.13"
 authors = [
-    { name = "Authsome Contributors" },
+    { name = "Manoj Bajaj", email = "manojbajaj95@gmail.com" },
 ]
 keywords = ["auth", "credentials", "oauth2", "api-key", "mcp", "agents"]
 classifiers = [
@@ -18,9 +19,7 @@ classifiers = [
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Security",
     "Topic :: Software Development :: Libraries",
 ]
@@ -47,3 +46,19 @@ packages = ["src/authsome"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+
+[tool.coverage.run]
+source = ["authsome"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+ignore = []

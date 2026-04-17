@@ -1,15 +1,15 @@
 """Tests for authentication flows."""
 
-import os
-import pytest
 from pathlib import Path
 from unittest.mock import patch
 
-from authsome.crypto.keyring_crypto import KeyringCryptoBackend
+import pytest
+
+from authsome.crypto.local_file_crypto import LocalFileCryptoBackend
+from authsome.errors import AuthenticationFailedError, CredentialMissingError
 from authsome.flows.api_key import ApiKeyEnvFlow, ApiKeyPromptFlow
 from authsome.models.enums import AuthType, ConnectionStatus, FlowType
 from authsome.models.provider import ApiKeyConfig, ProviderDefinition
-from authsome.errors import AuthenticationFailedError, CredentialMissingError
 
 
 def _make_api_key_provider() -> ProviderDefinition:
@@ -30,10 +30,10 @@ class TestApiKeyPromptFlow:
     """API key prompt flow tests."""
 
     @pytest.fixture
-    def crypto(self, tmp_path: Path) -> KeyringCryptoBackend:
-        return KeyringCryptoBackend(tmp_path)
+    def crypto(self, tmp_path: Path) -> LocalFileCryptoBackend:
+        return LocalFileCryptoBackend(tmp_path)
 
-    def test_successful_login(self, crypto: KeyringCryptoBackend) -> None:
+    def test_successful_login(self, crypto: LocalFileCryptoBackend) -> None:
         flow = ApiKeyPromptFlow()
         provider = _make_api_key_provider()
 
@@ -55,7 +55,7 @@ class TestApiKeyPromptFlow:
         decrypted = crypto.decrypt(record.api_key)
         assert decrypted == "sk-test-key-123"
 
-    def test_empty_key_rejected(self, crypto: KeyringCryptoBackend) -> None:
+    def test_empty_key_rejected(self, crypto: LocalFileCryptoBackend) -> None:
         flow = ApiKeyPromptFlow()
         provider = _make_api_key_provider()
 
@@ -68,7 +68,7 @@ class TestApiKeyPromptFlow:
                     connection_name="default",
                 )
 
-    def test_whitespace_only_rejected(self, crypto: KeyringCryptoBackend) -> None:
+    def test_whitespace_only_rejected(self, crypto: LocalFileCryptoBackend) -> None:
         flow = ApiKeyPromptFlow()
         provider = _make_api_key_provider()
 
@@ -81,7 +81,7 @@ class TestApiKeyPromptFlow:
                     connection_name="default",
                 )
 
-    def test_missing_api_key_config(self, crypto: KeyringCryptoBackend) -> None:
+    def test_missing_api_key_config(self, crypto: LocalFileCryptoBackend) -> None:
         flow = ApiKeyPromptFlow()
         provider = ProviderDefinition(
             name="noconfig",
@@ -102,12 +102,10 @@ class TestApiKeyEnvFlow:
     """API key env import flow tests."""
 
     @pytest.fixture
-    def crypto(self, tmp_path: Path) -> KeyringCryptoBackend:
-        return KeyringCryptoBackend(tmp_path)
+    def crypto(self, tmp_path: Path) -> LocalFileCryptoBackend:
+        return LocalFileCryptoBackend(tmp_path)
 
-    def test_successful_env_import(
-        self, crypto: KeyringCryptoBackend, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_successful_env_import(self, crypto: LocalFileCryptoBackend, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("TEST_API_KEY", "env-key-value")
         flow = ApiKeyEnvFlow()
         provider = _make_api_key_provider()
@@ -123,9 +121,7 @@ class TestApiKeyEnvFlow:
         assert record.api_key is not None
         assert crypto.decrypt(record.api_key) == "env-key-value"
 
-    def test_missing_env_var(
-        self, crypto: KeyringCryptoBackend, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_missing_env_var(self, crypto: LocalFileCryptoBackend, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv("TEST_API_KEY", raising=False)
         flow = ApiKeyEnvFlow()
         provider = _make_api_key_provider()
@@ -138,7 +134,7 @@ class TestApiKeyEnvFlow:
                 connection_name="default",
             )
 
-    def test_no_env_var_defined(self, crypto: KeyringCryptoBackend) -> None:
+    def test_no_env_var_defined(self, crypto: LocalFileCryptoBackend) -> None:
         flow = ApiKeyEnvFlow()
         provider = ProviderDefinition(
             name="noenv",

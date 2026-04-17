@@ -35,6 +35,66 @@ print(client.export("openai", format="shell"))
 client.run(["curl", "https://api.github.com/user"], providers=["github"])
 ```
 
+## CLI Usage
+
+Authsome provides a powerful command-line interface to manage your credentials without writing any code. All commands support the `--json` flag for machine-readable output.
+
+### Basic Commands
+```bash
+# Initialize the store (creates ~/.authsome)
+authsome init
+
+# Check the health of your installation
+authsome doctor
+
+# List all connected providers and their status
+authsome list
+```
+
+### Authentication
+```bash
+# Start an authentication flow (will prompt or open browser)
+authsome login github
+
+# Revoke your token remotely and remove it locally
+authsome revoke github
+
+# Just remove the local credential state
+authsome remove github
+```
+
+### Retrieving Credentials
+```bash
+# Inspect your local connection metadata (secrets are redacted by default)
+authsome get github
+
+# Reveal the secret
+authsome get github --show-secret
+
+# Extract a specific field
+authsome get github --field status
+```
+
+### Exporting and Running
+```bash
+# Output environment variables for your shell
+authsome export github --format shell
+
+# Execute a command with injected credentials
+authsome run --provider openai -- python script.py
+```
+
+### Profiles
+Switching profiles allows you to manage multiple sets of credentials safely.
+```bash
+authsome profile list
+authsome profile create work
+authsome profile use work
+
+# Alternatively, override the profile per command:
+authsome --profile work list
+```
+
 ## How It Works
 
 ```

@@ -28,3 +28,4 @@ jobs:
     uses: ./.github/workflows/publish.yml
     permissions:
       id-token: write
+      contents: read

@@ -1,0 +1,30 @@
+{
+    "schema_version": 1,
+    "name": "linear",
+    "display_name": "Linear",
+    "auth_type": "oauth2",
+    "flow": "dcr_pkce",
+    "oauth": {
+        "authorization_url": "https://mcp.linear.app/authorize",
+        "token_url": "https://mcp.linear.app/token",
+        "revocation_url": "https://mcp.linear.app/token",
+        "device_authorization_url": null,
+        "scopes": [
+            "read",
+            "write"
+        ],
+        "pkce": true,
+        "supports_device_flow": false,
+        "supports_dcr": true
+    },
+    "client": {
+        "client_id": "env:LINEAR_CLIENT_ID",
+        "client_secret": "env:LINEAR_CLIENT_SECRET"
+    },
+    "export": {
+        "env": {
+            "access_token": "LINEAR_ACCESS_TOKEN",
+            "refresh_token": "LINEAR_REFRESH_TOKEN"
+        }
+    }
+}

@@ -3,7 +3,7 @@
   "name": "github",
   "display_name": "GitHub",
   "auth_type": "oauth2",
-  "flow": "dcr_pkce",
+  "flow": "pkce",
   "oauth": {
     "authorization_url": "https://github.com/login/oauth/authorize",
     "token_url": "https://github.com/login/oauth/access_token",

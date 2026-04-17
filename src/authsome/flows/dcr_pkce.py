@@ -134,7 +134,7 @@ class DcrPkceFlow(AuthFlow):
         code_verifier, code_challenge = _generate_pkce()
 
         # Start local callback server
-        port = _find_free_port()
+        port = 7999
         redirect_uri = f"http://127.0.0.1:{port}/callback"
 
         # Reset handler state

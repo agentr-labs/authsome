@@ -7,6 +7,41 @@ description: Manage third-party credentials (API keys, OAuth2 tokens) locally us
 
 This skill enables the autonomous management of the credential lifecycle for tools and applications using the `authsome` CLI.
 
+## Installation & Invocation
+
+Before running any `authsome` command, determine how to invoke it using this priority order:
+
+1. **`uvx` (preferred)** — if `uvx` is available, invoke as `uvx authsome <cmd>`. No install needed; uvx runs it in an isolated environment.
+   ```bash
+   uvx authsome whoami
+   ```
+
+2. **`pipx`** — if `uvx` is not found but `pipx` is available, invoke as `pipx run authsome <cmd>`.
+   ```bash
+   pipx run authsome whoami
+   ```
+
+3. **Installed in PATH** — if `authsome` is already installed and available directly (e.g., via `pip install authsome` in the active venv or globally), invoke it as `authsome <cmd>`.
+
+4. **Not found — ask the user** — if none of the above work, do not guess. Inform the user and suggest one of these options:
+   - **Recommended (isolated):** `pip install uv` then use `uvx authsome`
+   - **Global install:** `pipx install authsome` (requires pipx)
+   - **Local venv:** `pip install authsome` inside the project's virtual environment, then activate it
+
+> **Detection snippet** (run once per session to set `AUTHSOME_CMD`):
+> ```bash
+> if command -v uvx &>/dev/null; then
+>   AUTHSOME_CMD="uvx authsome"
+> elif command -v pipx &>/dev/null; then
+>   AUTHSOME_CMD="pipx run authsome"
+> elif command -v authsome &>/dev/null; then
+>   AUTHSOME_CMD="authsome"
+> else
+>   echo "authsome not found — please install it (see skill instructions)"
+> fi
+> ```
+> Use `$AUTHSOME_CMD` in place of `authsome` in all commands below.
+
 ## Core Workflow
 
 Always ensure `authsome` is initialized before performing other operations.

@@ -1,4 +1,0 @@
-interface:
-  display_name: "uv Trusted Publish"
-  short_description: "Set up trusted publishing to PyPI from GitHub Actions with uv"
-  default_prompt: "Use this skill when setting up or maintaining uv-based trusted publishing from GitHub Actions to PyPI."

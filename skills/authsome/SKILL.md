@@ -1,6 +1,7 @@
 ---
 name: authsome
-description: Manage third-party credentials (API keys, OAuth2 tokens) locally using the authsome CLI. Use this skill when the user wants to login to a service (GitHub, OpenAI, Google, etc.), retrieve authentication headers, export credentials to the shell, or run commands with injected authentication environment variables. Trigger this for any request involving authenticating AI agents, managing tool tokens, or securely storing/retrieving API keys.
+version: 0.1.2
+description: This skill should be used when the user wants to "login to GitHub", "store an API key", "get authentication headers", "export credentials to the shell", "run a command with API keys injected", "register a custom OAuth provider", "manage tool tokens", or "authenticate to a third-party application". Also triggers for requests involving authenticating AI agents or securely storing/retrieving credentials using the authsome CLI.
 ---
 
 # Authsome CLI Skill

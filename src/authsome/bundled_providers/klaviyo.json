@@ -3,12 +3,10 @@
   "name": "klaviyo",
   "display_name": "Klaviyo",
   "auth_type": "api_key",
-  "flow": "api_key_prompt",
+  "flow": "api_key",
   "api_key": {
-    "input_mode": "prompt",
     "header_name": "Authorization",
-    "header_prefix": "Klaviyo-API-Key",
-    "env_var": "KLAVIYO_API_KEY"
+    "header_prefix": "Klaviyo-API-Key"
   },
   "export": {
     "env": {

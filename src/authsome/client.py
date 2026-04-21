@@ -43,6 +43,7 @@ from authsome.flows.pkce import PkceFlow
 from authsome.models.config import GlobalConfig
 from authsome.models.connection import (
     ConnectionRecord,
+    ProviderClientRecord,
     ProviderMetadataRecord,
     ProviderStateRecord,
 )
@@ -296,6 +297,10 @@ class AuthClient:
         scopes: list[str] | None = None,
         flow_override: FlowType | None = None,
         profile: str | None = None,
+        client_id: str | None = None,
+        client_secret: str | None = None,
+        api_key: str | None = None,
+        force: bool = False,
     ) -> ConnectionRecord:
         """
         Authenticate with a provider using its configured flow.
@@ -306,6 +311,9 @@ class AuthClient:
             scopes: Optional scope override.
             flow_override: Optional flow type override.
             profile: Optional profile override.
+            client_id: Optional client ID override.
+            client_secret: Optional client secret override.
+            api_key: Optional API key override.
 
         Returns:
             The created ConnectionRecord.
@@ -324,13 +332,62 @@ class AuthClient:
             raise UnsupportedFlowError(flow_type.value, provider=provider)
 
         handler = handler_cls()
+
+        # Fetch or update client credentials
+        client_record = self.get_provider_client_credentials(provider, profile_name)
+        
+        if client_id or client_secret:
+            if client_record is not None and (client_record.client_id or client_record.client_secret):
+                if not force:
+                    raise AuthenticationFailedError(
+                        "Client credentials already exist for this provider. Overriding them "
+                        "may break existing connections. Use --force to proceed.",
+                        provider=provider,
+                    )
+            
+            if client_record is None:
+                client_record = ProviderClientRecord(
+                    profile=profile_name,
+                    provider=provider,
+                )
+            if client_id is not None:
+                client_record.client_id = client_id
+            if client_secret is not None:
+                client_record.client_secret = self.crypto.encrypt(client_secret)
+            self._save_provider_client_credentials(client_record)
+
+        flow_client_id = client_record.client_id if client_record else None
+        flow_client_secret = self.crypto.decrypt(client_record.client_secret) if client_record and client_record.client_secret else None
+        flow_api_key = api_key
+
         record = handler.authenticate(
             provider=definition,
             crypto=self.crypto,
             profile=profile_name,
             connection_name=connection_name,
             scopes=scopes,
+            client_id=flow_client_id,
+            client_secret=flow_client_secret,
+            api_key=flow_api_key,
         )
+
+        # For flows like DCR that generate client credentials and pass them via metadata
+        if "_dcr_client_id" in record.metadata:
+            if client_record is None:
+                client_record = ProviderClientRecord(
+                    profile=profile_name,
+                    provider=provider,
+                )
+            client_record.client_id = record.metadata.pop("_dcr_client_id")
+            
+            dcr_secret_dict = record.metadata.pop("_dcr_client_secret", None)
+            if dcr_secret_dict:
+                from authsome.crypto.base import EncryptedField
+                client_record.client_secret = EncryptedField(**dcr_secret_dict)
+            else:
+                client_record.client_secret = None
+                
+            self._save_provider_client_credentials(client_record)
 
         # Persist the connection record
         self._save_connection(record)
@@ -738,6 +795,29 @@ class AuthClient:
         )
         store.set(key, record.model_dump_json())
 
+    def get_provider_client_credentials(self, provider: str, profile: str) -> ProviderClientRecord | None:
+        """Get the stored client credentials for a provider."""
+        store = self._get_store(profile)
+        key = build_store_key(
+            profile=profile,
+            provider=provider,
+            record_type="client",
+        )
+        record_json = store.get(key)
+        if record_json:
+            return ProviderClientRecord.model_validate_json(record_json)
+        return None
+
+    def _save_provider_client_credentials(self, record: ProviderClientRecord) -> None:
+        """Persist a provider client record to the store."""
+        store = self._get_store(record.profile)
+        key = build_store_key(
+            profile=record.profile,
+            provider=record.provider,
+            record_type="client",
+        )
+        store.set(key, record.model_dump_json())
+
     def _update_provider_metadata(
         self,
         profile: str,
@@ -865,16 +945,15 @@ class AuthClient:
 
         refresh_token_value = self.crypto.decrypt(record.refresh_token)
 
-        # Use stored DCR client credentials if available
-        client_id = record.client_id
+        # Retrieve profile-level provider client credentials
+        client_record = self.get_provider_client_credentials(provider_name, record.profile)
+        client_id = None
         client_secret = None
-        if record.client_secret:
-            client_secret = self.crypto.decrypt(record.client_secret)
-
-        # Fallback to provider-level client config
-        if not client_id and definition.client:
-            client_id = definition.client.resolve_client_id()
-            client_secret = definition.client.resolve_client_secret()
+        
+        if client_record:
+            client_id = client_record.client_id
+            if client_record.client_secret:
+                client_secret = self.crypto.decrypt(client_record.client_secret)
 
         if not client_id:
             raise RefreshFailedError("No client_id available for refresh", provider=provider_name)

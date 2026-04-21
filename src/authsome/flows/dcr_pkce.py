@@ -116,6 +116,9 @@ class DcrPkceFlow(AuthFlow):
         profile: str,
         connection_name: str,
         scopes: list[str] | None = None,
+        client_id: str | None = None,
+        client_secret: str | None = None,
+        api_key: str | None = None,
     ) -> ConnectionRecord:
         """Execute the full DCR + PKCE flow."""
         if provider.oauth is None:
@@ -127,7 +130,10 @@ class DcrPkceFlow(AuthFlow):
         effective_scopes = scopes or provider.oauth.scopes or []
 
         # --- Phase 1: Dynamic Client Registration ---
-        client_id, client_secret = self._register_client(provider, effective_scopes)
+        if not client_id:
+            client_id, client_secret = self._register_client(provider, effective_scopes)
+        else:
+            logger.info("Reusing existing client credentials for DCR flow")
 
         # --- Phase 2: PKCE Authorization ---
         code_verifier, code_challenge = _generate_pkce()
@@ -230,10 +236,11 @@ class DcrPkceFlow(AuthFlow):
             token_type=token_type,
             expires_at=expires_at,
             obtained_at=now,
-            client_id=client_id,
-            client_secret=encrypted_client_secret,
             account=AccountInfo(),
-            metadata={},
+            metadata={
+                "_dcr_client_id": client_id,
+                "_dcr_client_secret": encrypted_client_secret.model_dump() if encrypted_client_secret else None,
+            },
         )
 
     def _discover_registration_endpoint(self, provider: ProviderDefinition) -> str:

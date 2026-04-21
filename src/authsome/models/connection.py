@@ -61,10 +61,6 @@ class ConnectionRecord(BaseModel):
     # Account info
     account: AccountInfo | None = Field(default_factory=AccountInfo)
 
-    # DCR-obtained client credentials (stored encrypted)
-    client_id: str | None = None
-    client_secret: EncryptedField | None = None
-
     # Forward-compatible metadata
     metadata: dict[str, Any] = Field(default_factory=dict)
 
@@ -104,3 +100,21 @@ class ProviderStateRecord(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     model_config = {"extra": "allow"}
+
+
+class ProviderClientRecord(BaseModel):
+    """
+    Client credentials configured for a provider within a profile.
+
+    Spec: Stored at key profile:<profile>:<provider>:client.
+    """
+
+    schema_version: int = 1
+    profile: str
+    provider: str
+    client_id: str | None = None
+    client_secret: EncryptedField | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    model_config = {"extra": "allow"}
+

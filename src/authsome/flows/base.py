@@ -25,6 +25,9 @@ class AuthFlow(ABC):
         profile: str,
         connection_name: str,
         scopes: list[str] | None = None,
+        client_id: str | None = None,
+        client_secret: str | None = None,
+        api_key: str | None = None,
     ) -> ConnectionRecord:
         """
         Execute the authentication flow and return a connection record.
@@ -35,6 +38,9 @@ class AuthFlow(ABC):
             profile: The profile name to associate the connection with.
             connection_name: The connection name within the profile.
             scopes: Optional override for requested scopes.
+            client_id: Optional provided client ID.
+            client_secret: Optional provided client secret.
+            api_key: Optional provided API key.
 
         Returns:
             A ConnectionRecord with encrypted credential fields.

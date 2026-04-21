@@ -304,14 +304,12 @@ def remove(ctx_obj: ContextObj, provider: str, connection: str) -> None:
 @common_options
 @pass_ctx
 @handle_errors
-def get(
-    ctx_obj: ContextObj, provider: str, connection: str, field: str | None, show_secret: bool
-) -> None:
+def get(ctx_obj: ContextObj, provider: str, connection: str, field: str | None, show_secret: bool) -> None:
     """Return provider connection metadata by default."""
     client = ctx_obj.initialize_client()
     record = client.get_connection(provider, connection)
 
-    data = record.model_dump()
+    data = record.model_dump(mode="json")
 
     # Redact secrets unless requested
     if not show_secret:
@@ -352,7 +350,7 @@ def inspect(ctx_obj: ContextObj, provider: str) -> None:
     client = ctx_obj.initialize_client()
     definition = client.get_provider(provider)
 
-    data = definition.model_dump()
+    data = definition.model_dump(mode="json")
     if ctx_obj.json_output:
         ctx_obj.print_json(data)
     else:
@@ -476,7 +474,6 @@ def doctor(ctx_obj: ContextObj) -> None:
 
         if not all_ok:
             sys.exit(1)
-
 
 
 if __name__ == "__main__":

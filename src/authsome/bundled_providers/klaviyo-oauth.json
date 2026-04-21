@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "name": "klaviyo-oauth",
+  "display_name": "Klaviyo (OAuth)",
+  "auth_type": "oauth2",
+  "flow": "pkce",
+  "oauth": {
+    "authorization_url": "https://www.klaviyo.com/oauth/authorize",
+    "token_url": "https://a.klaviyo.com/oauth/token",
+    "revocation_url": "https://a.klaviyo.com/oauth/revoke",
+    "scopes": [
+      "accounts:read"
+    ],
+    "pkce": true,
+    "supports_device_flow": false,
+    "supports_dcr": false
+  },
+  "export": {
+    "env": {
+      "access_token": "KLAVIYO_OAUTH_ACCESS_TOKEN",
+      "refresh_token": "KLAVIYO_OAUTH_REFRESH_TOKEN"
+    }
+  }
+}

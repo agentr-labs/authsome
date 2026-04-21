@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "name": "semrush",
+  "display_name": "SEMrush",
+  "auth_type": "api_key",
+  "flow": "api_key_prompt",
+  "api_key": {
+    "input_mode": "prompt",
+    "header_name": "Authorization",
+    "header_prefix": "Bearer",
+    "env_var": "SEMRUSH_API_KEY"
+  },
+  "export": {
+    "env": {
+      "api_key": "SEMRUSH_API_KEY"
+    }
+  }
+}

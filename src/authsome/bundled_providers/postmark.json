@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "name": "postmark",
+  "display_name": "Postmark",
+  "auth_type": "api_key",
+  "flow": "api_key_prompt",
+  "api_key": {
+    "input_mode": "prompt",
+    "header_name": "X-Postmark-Server-Token",
+    "header_prefix": "",
+    "env_var": "POSTMARK_API_KEY"
+  },
+  "export": {
+    "env": {
+      "api_key": "POSTMARK_API_KEY"
+    }
+  }
+}

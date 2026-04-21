@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "name": "klaviyo",
+  "display_name": "Klaviyo",
+  "auth_type": "api_key",
+  "flow": "api_key_prompt",
+  "api_key": {
+    "input_mode": "prompt",
+    "header_name": "Authorization",
+    "header_prefix": "Klaviyo-API-Key",
+    "env_var": "KLAVIYO_API_KEY"
+  },
+  "export": {
+    "env": {
+      "api_key": "KLAVIYO_API_KEY"
+    }
+  }
+}

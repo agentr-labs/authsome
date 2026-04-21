@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "name": "lemlist",
+  "display_name": "Lemlist",
+  "auth_type": "api_key",
+  "flow": "api_key_prompt",
+  "api_key": {
+    "input_mode": "prompt",
+    "header_name": "Authorization",
+    "header_prefix": "Bearer",
+    "env_var": "LEMLIST_API_KEY"
+  },
+  "export": {
+    "env": {
+      "api_key": "LEMLIST_API_KEY"
+    }
+  }
+}

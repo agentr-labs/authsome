@@ -5,34 +5,68 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![PyPI downloads](https://img.shields.io/pypi/dm/authsome.svg)](https://pypi.org/project/authsome/)
 
-**OAuth2 and API key management for agents. Local. Headless. Portable.**
+**OAuth2 and API key management for agents. Local. Headless. No SaaS.**
 
-Authenticate once. Get valid headers anywhere. No server, no account, no cloud.
+Your agent calls APIs. Authsome keeps the credentials fresh.
 
 ---
 
 ## The Problem
 
-Agents and developer tools need to call APIs. Authentication keeps getting in the way:
+Agents need to call APIs. The current answers are all wrong for agents:
 
-- OAuth2 flows are stateful — browsers, callbacks, token exchange
-- Tokens expire — refresh logic gets reinvented in every project
-- API keys get hardcoded or lost in shell profiles
-- There's no standard answer to: *"give me a valid GitHub token right now"*
+- **Hardcode a PAT in `.env`** — works until the token expires, rotates, or leaks
+- **Write OAuth2 yourself** — ~200 lines of flow logic, token storage, and refresh handling per project, using authlib or requests-oauthlib, reinvented every time
+- **Nango** — full OAuth infrastructure, but it's a SaaS service with a server you have to run or pay for
 
-Authsome is a local authentication layer that handles login, logout, and token refresh for your agents and scripts. You ask for headers. You get headers. It's the agent's job to call APIs — it's authsome's job to keep the credentials fresh.
+None of these are designed for agents. They assume a browser, a web server, or a human in the loop at runtime.
+
+Authsome is a local credential layer your agent invokes at runtime. Authenticate once, headlessly. After that, your agent asks for headers and gets them.
 
 ---
 
-## What It Does
+## How It Works
 
-- **Login flows** — PKCE, Device Code, Dynamic Client Registration, API key prompt
-- **Automatic token refresh** — tokens are refreshed before expiry, transparently
-- **One call for valid headers** — always returns a usable `Authorization` header
-- **Subprocess injection** — run any command with credentials in its environment
-- **Headless-friendly** — Device Code flow works in CI, SSH sessions, and remote agents
-- **35 bundled providers** — GitHub, Google, OpenAI, Linear, Slack, and more, zero config
-- **Portable** — follows your `~/.authsome` directory; works on any machine you're on
+The CLI is the agent's interface — for setup and for runtime use.
+
+Authenticate once:
+
+```bash
+authsome login github
+```
+
+Then the agent gets a valid, automatically-refreshed token on demand:
+
+```bash
+authsome get github --field access_token
+# → ghu_...
+
+authsome export github --format shell
+# → export GITHUB_TOKEN=ghu_...
+
+authsome run --provider github --provider openai -- python my_agent.py
+# runs the script with GITHUB_TOKEN and OPENAI_API_KEY injected
+```
+
+Credentials are stored locally, encrypted at rest (AES-256-GCM), and refreshed before expiry. No server. No account. No cloud.
+
+---
+
+## Why Authsome
+
+| | authsome | Hardcoded env tokens | DIY (authlib) | Nango |
+|--|:--------:|:--------------------:|:-------------:|:-----:|
+| OAuth2 flows (PKCE, Device Code, DCR) | ✅ | ❌ | build it | ✅ |
+| Automatic token refresh | ✅ | ❌ | build it | ✅ |
+| Headless (CI, SSH, no browser) | ✅ | ✅ | varies | ⚠️ |
+| Local — no SaaS dependency | ✅ | ✅ | ✅ | ❌ |
+| 35 providers, zero config | ✅ | ❌ | ❌ | ✅ |
+| Multi-account per provider | ✅ | ❌ | build it | ✅ |
+| One call for valid token | ✅ | ❌ | build it | ✅ |
+
+**vs. DIY (authlib / requests-oauthlib):** authlib handles the HTTP exchange, but you still write the token store, refresh logic, expiry handling, and per-provider config — then repeat it for every project. Authsome eliminates that boilerplate entirely.
+
+**vs. Nango:** Nango is the closest conceptual peer — it manages OAuth for you across many providers. The difference: Nango requires a hosted server (or their SaaS). Authsome runs locally, follows your `~/.authsome` directory, and has no external dependencies. It's the right choice when your agent runs on machines you control and you don't want infrastructure you don't own in the auth path.
 
 ---
 
@@ -41,41 +75,11 @@ Authsome is a local authentication layer that handles login, logout, and token r
 ```bash
 pip install authsome
 authsome init
-authsome login github      # opens browser, completes OAuth2 PKCE flow
-authsome login openai      # prompts for API key
-authsome list              # all authenticated services and token status
+authsome login github                  # opens browser, completes PKCE flow
+authsome login github --flow device    # headless: Device Code, works over SSH and CI
+authsome login openai                  # prompts for API key
+authsome list                          # all connections + token status
 ```
-
-```python
-from authsome import AuthClient
-
-client = AuthClient()
-
-# Always returns a valid, refreshed Authorization header
-headers = client.get_auth_headers("github")
-# → {"Authorization": "Bearer ghu_..."}
-
-headers = client.get_auth_headers("openai")
-# → {"Authorization": "Bearer sk-..."}
-
-# Inject credentials into any subprocess — no env files needed
-client.run(["python", "script.py"], providers=["github", "openai"])
-```
-
----
-
-## Why Authsome
-
-Your agent should call APIs, not manage auth state. Authsome is the authentication layer between your agent and the services it uses — local, offline-capable, and zero-dependency on external infrastructure.
-
-| | Authsome | Manual `.env` | Roll your own |
-|--|----------|--------------|--------------|
-| OAuth2 flows (PKCE, Device, DCR) | ✅ | ❌ | build it |
-| Automatic token refresh | ✅ | ❌ | build it |
-| 35 providers, zero config | ✅ | ❌ | build it |
-| Headless / CI / SSH | ✅ | ✅ | varies |
-| Multi-account per provider | ✅ | ❌ | build it |
-| No server, no account | ✅ | ✅ | ✅ |
 
 ---
 
@@ -99,12 +103,12 @@ authsome get github                    # connection metadata (secrets redacted)
 authsome get github --show-secret      # reveal token
 authsome get github --field status     # extract one field
 
-# Export & run
+# Export & inject
 authsome export github --format shell  # → export GITHUB_TOKEN=...
-authsome run --provider openai -- python script.py
+authsome run --provider openai -- python my_agent.py
 ```
 
-All commands support `--json` for machine-readable output and `--profile` to switch between credential sets (e.g., personal vs. work).
+All commands support `--json` for machine-readable output and `--profile` to switch between credential sets (e.g., personal vs. work vs. a specific agent).
 
 ---
 
@@ -137,7 +141,7 @@ Add your own by dropping a JSON file in `~/.authsome/providers/<name>.json`.
 
 ```
 ┌─────────────────┐     ┌──────────────┐     ┌────────────────────┐
-│   Agent / Tool  │────▶│  AuthClient  │────▶│  Provider Registry  │
+│   Agent / Tool  │────▶│     CLI      │────▶│  Provider Registry  │
 │                 │     │              │     │  (bundled + local)  │
 └─────────────────┘     └──────┬───────┘     └────────────────────┘
                                │
@@ -158,7 +162,7 @@ Add your own by dropping a JSON file in `~/.authsome/providers/<name>.json`.
                         └──────────────┘
 ```
 
-`AuthClient` is the single entry point. It resolves the right flow per provider, manages token refresh transparently, and delegates persistence to a per-profile SQLite store. Profiles let you isolate credential sets (e.g., personal, work, a specific agent).
+The CLI resolves the right flow per provider, manages token refresh transparently, and persists credentials in a per-profile SQLite store. Profiles let you isolate credential sets (e.g., personal, work, a specific agent).
 
 ### Auth Flows
 
@@ -167,12 +171,13 @@ Add your own by dropping a JSON file in `~/.authsome/providers/<name>.json`.
 | `pkce` | Browser-capable environments with a pre-registered OAuth client |
 | `device_code` | Headless servers, CI, SSH sessions — no browser required |
 | `dcr_pkce` | Services supporting Dynamic Client Registration — no pre-registration needed |
-| `api_key_prompt` | Interactive terminal, prompts securely via `getpass` |
+| `api_key_prompt` | Interactive terminal, prompts securely |
 | `api_key_env` | Import a key already present in an environment variable |
 
 ### Custom Providers
 
-**Via JSON** (`~/.authsome/providers/my-service.json`):
+Drop a JSON file at `~/.authsome/providers/my-service.json`:
+
 ```json
 {
   "name": "my-service",
@@ -187,29 +192,23 @@ Add your own by dropping a JSON file in `~/.authsome/providers/<name>.json`.
 }
 ```
 
-**Via Python:**
-```python
-from authsome import ProviderDefinition, AuthType, FlowType
-from authsome.models.provider import ApiKeyConfig
+Then use it like any bundled provider:
 
-client.register_provider(ProviderDefinition(
-    name="my-service",
-    display_name="My Service",
-    auth_type=AuthType.API_KEY,
-    flow=FlowType.API_KEY_PROMPT,
-    api_key=ApiKeyConfig(header_name="X-API-Key", header_prefix="", env_var="MY_SERVICE_KEY"),
-))
+```bash
+authsome login my-service
+authsome get my-service --show-secret
 ```
 
 ### Multiple Connections
 
 Same provider, multiple accounts:
 
-```python
-client.login("openai", connection_name="personal")
-client.login("openai", connection_name="work")
+```bash
+authsome login openai --connection personal
+authsome login openai --connection work
 
-headers = client.get_auth_headers("openai", connection="work")
+authsome get openai --connection work --show-secret
+authsome run --provider openai --connection work -- python my_agent.py
 ```
 
 ### Storage Layout

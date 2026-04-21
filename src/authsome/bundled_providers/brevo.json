@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "name": "brevo",
+  "display_name": "Brevo",
+  "auth_type": "api_key",
+  "flow": "api_key_prompt",
+  "api_key": {
+    "input_mode": "prompt",
+    "header_name": "api-key",
+    "header_prefix": "",
+    "env_var": "BREVO_API_KEY"
+  },
+  "export": {
+    "env": {
+      "api_key": "BREVO_API_KEY"
+    }
+  }
+}

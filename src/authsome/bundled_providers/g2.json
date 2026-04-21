@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "name": "g2",
+  "display_name": "G2",
+  "auth_type": "api_key",
+  "flow": "api_key_prompt",
+  "api_key": {
+    "input_mode": "prompt",
+    "header_name": "Authorization",
+    "header_prefix": "Token",
+    "env_var": "G2_API_TOKEN"
+  },
+  "export": {
+    "env": {
+      "api_key": "G2_API_TOKEN"
+    }
+  }
+}

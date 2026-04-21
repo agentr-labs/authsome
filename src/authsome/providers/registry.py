@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 # Valid flow types per auth type
 _VALID_FLOWS: dict[AuthType, set[FlowType]] = {
     AuthType.OAUTH2: {FlowType.PKCE, FlowType.DEVICE_CODE, FlowType.DCR_PKCE},
-    AuthType.API_KEY: {FlowType.API_KEY_PROMPT, FlowType.API_KEY_ENV},
+    AuthType.API_KEY: {FlowType.API_KEY, FlowType.API_KEY},
 }
 
 

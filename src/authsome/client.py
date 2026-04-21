@@ -28,6 +28,7 @@ from authsome.crypto.base import CryptoBackend
 from authsome.crypto.keyring_crypto import KeyringCryptoBackend
 from authsome.crypto.local_file_crypto import LocalFileCryptoBackend
 from authsome.errors import (
+    AuthenticationFailedError,
     ConnectionNotFoundError,
     CredentialMissingError,
     ProfileNotFoundError,

@@ -44,6 +44,34 @@ class ContextObj:
 pass_ctx = click.make_pass_decorator(ContextObj)
 
 
+def common_options(f):
+    """Decorator to add common global options to both group and subcommands."""
+
+    @click.option("--json", "json_output", is_flag=True, help="Output in machine-readable JSON format.")
+    @click.option("--quiet", is_flag=True, help="Suppress non-essential output.")
+    @click.option("--no-color", is_flag=True, help="Disable ANSI colors.")
+    @functools.wraps(f)
+    def wrapper(*args, **kwargs):
+        json_output = kwargs.pop("json_output", False)
+        quiet = kwargs.pop("quiet", False)
+        no_color = kwargs.pop("no_color", False)
+
+        ctx = click.get_current_context()
+        if getattr(ctx, "obj", None) is None:
+            ctx.obj = ContextObj(json_output, quiet, no_color)
+        else:
+            if json_output:
+                ctx.obj.json_output = True
+            if quiet:
+                ctx.obj.quiet = True
+            if no_color:
+                ctx.obj.no_color = True
+
+        return f(*args, **kwargs)
+
+    return wrapper
+
+
 def format_error_code(exc: Exception) -> int:
     """Map exceptions to standard exit codes per spec §18.3."""
     if not isinstance(exc, AuthsomeError):
@@ -86,17 +114,15 @@ def handle_errors(func):
 
 
 @click.group()
-@click.option("--json", "json_output", is_flag=True, help="Output in machine-readable JSON format.")
-@click.option("--quiet", is_flag=True, help="Suppress non-essential output.")
-@click.option("--no-color", is_flag=True, help="Disable ANSI colors.")
+@common_options
 @click.pass_context
-def cli(ctx: click.Context, json_output: bool, quiet: bool, no_color: bool) -> None:
+def cli(ctx: click.Context) -> None:
     """Authsome: Portable local authentication library for AI agents and tools."""
-    logging.getLogger("authsome").setLevel(logging.WARNING if quiet else logging.INFO)
-    ctx.obj = ContextObj(json_output, quiet, no_color)
+    logging.getLogger("authsome").setLevel(logging.WARNING if ctx.obj.quiet else logging.INFO)
 
 
 @cli.command()
+@common_options
 @pass_ctx
 @handle_errors
 def init(ctx_obj: ContextObj) -> None:
@@ -111,6 +137,7 @@ def init(ctx_obj: ContextObj) -> None:
 
 
 @cli.command(name="list")
+@common_options
 @pass_ctx
 @handle_errors
 def list_cmd(ctx_obj: ContextObj) -> None:
@@ -189,6 +216,7 @@ def list_cmd(ctx_obj: ContextObj) -> None:
 @click.option("--client-secret", help="Provider Client Secret")
 @click.option("--api-key", help="Provider API Key")
 @click.option("--force", is_flag=True, help="Force override existing client credentials.")
+@common_options
 @pass_ctx
 @handle_errors
 def login(
@@ -237,6 +265,7 @@ def login(
 @cli.command()
 @click.argument("provider")
 @click.option("--connection", default="default", help="Connection name.")
+@common_options
 @pass_ctx
 @handle_errors
 def revoke(ctx_obj: ContextObj, provider: str, connection: str) -> None:
@@ -253,6 +282,7 @@ def revoke(ctx_obj: ContextObj, provider: str, connection: str) -> None:
 @cli.command()
 @click.argument("provider")
 @click.option("--connection", default="default", help="Connection name.")
+@common_options
 @pass_ctx
 @handle_errors
 def remove(ctx_obj: ContextObj, provider: str, connection: str) -> None:
@@ -271,9 +301,12 @@ def remove(ctx_obj: ContextObj, provider: str, connection: str) -> None:
 @click.option("--connection", default="default", help="Connection name.")
 @click.option("--field", help="Return only a specific field.")
 @click.option("--show-secret", is_flag=True, help="Reveal encrypted secrets.")
+@common_options
 @pass_ctx
 @handle_errors
-def get(ctx_obj: ContextObj, provider: str, connection: str, field: str | None, show_secret: bool) -> None:
+def get(
+    ctx_obj: ContextObj, provider: str, connection: str, field: str | None, show_secret: bool
+) -> None:
     """Return provider connection metadata by default."""
     client = ctx_obj.initialize_client()
     record = client.get_connection(provider, connection)
@@ -311,6 +344,7 @@ def get(ctx_obj: ContextObj, provider: str, connection: str, field: str | None, 
 
 @cli.command()
 @click.argument("provider")
+@common_options
 @pass_ctx
 @handle_errors
 def inspect(ctx_obj: ContextObj, provider: str) -> None:
@@ -329,6 +363,7 @@ def inspect(ctx_obj: ContextObj, provider: str) -> None:
 @click.argument("provider")
 @click.option("--connection", default="default", help="Connection name.")
 @click.option("--format", "export_format", type=click.Choice(["env", "shell", "json"]), default="env")
+@common_options
 @pass_ctx
 @handle_errors
 def export(ctx_obj: ContextObj, provider: str, connection: str, export_format: str) -> None:
@@ -345,6 +380,7 @@ def export(ctx_obj: ContextObj, provider: str, connection: str, export_format: s
 @cli.command(context_settings=dict(ignore_unknown_options=True))
 @click.option("--provider", "-p", multiple=True, help="Provider(s) to inject credentials for.")
 @click.argument("command", nargs=-1, required=True)
+@common_options
 @pass_ctx
 @handle_errors
 def run(ctx_obj: ContextObj, provider: list[str], command: tuple[str]) -> None:
@@ -358,6 +394,7 @@ def run(ctx_obj: ContextObj, provider: list[str], command: tuple[str]) -> None:
 @cli.command()
 @click.argument("path")
 @click.option("--force", is_flag=True, help="Force overwrite if provider exists.")
+@common_options
 @pass_ctx
 @handle_errors
 def register(ctx_obj: ContextObj, path: str, force: bool) -> None:
@@ -388,6 +425,7 @@ def register(ctx_obj: ContextObj, path: str, force: bool) -> None:
 
 
 @cli.command()
+@common_options
 @pass_ctx
 @handle_errors
 def whoami(ctx_obj: ContextObj) -> None:
@@ -406,6 +444,7 @@ def whoami(ctx_obj: ContextObj) -> None:
 
 
 @cli.command()
+@common_options
 @pass_ctx
 @handle_errors
 def doctor(ctx_obj: ContextObj) -> None:

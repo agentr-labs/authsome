@@ -3,12 +3,10 @@
   "name": "g2",
   "display_name": "G2",
   "auth_type": "api_key",
-  "flow": "api_key_prompt",
+  "flow": "api_key",
   "api_key": {
-    "input_mode": "prompt",
     "header_name": "Authorization",
-    "header_prefix": "Token",
-    "env_var": "G2_API_TOKEN"
+    "header_prefix": "Token"
   },
   "export": {
     "env": {

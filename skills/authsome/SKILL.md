@@ -82,22 +82,24 @@ If the user already has a `"default"` connection for this provider, ask for a na
 ### Step 2.3: Run login
 
 ```bash
-$AUTHSOME login <provider> [--connection <name>] [--flow <flow_type>] [--scopes <scope1,scope2>]
+$AUTHSOME login <provider> [--connection <name>] [--flow <flow_type>] [--scopes <scope1,scope2>] [--client-id <id>] [--client-secret <secret>] [--api-key <key>]
 ```
+
+**Note on Credentials:** `authsome` stores client IDs and secrets securely in the profile store. If this is the first time logging in with a specific provider that doesn't use Dynamic Client Registration (DCR), you MUST pass the credentials via flags (`--client-id` and `--client-secret`). They will be securely saved and reused for subsequent logins for that provider.
 
 **Examples:**
 ```bash
-# Default flow
+# Default flow (if credentials are saved or provider supports DCR)
 $AUTHSOME login github
 
+# First-time login for provider requiring client credentials
+$AUTHSOME login github --client-id "my_client_id" --client-secret "my_client_secret"
+
 # Override flow to device code
-$AUTHSOME login github --flow device_code
+$AUTHSOME login github --flow device_code --client-id "my_client_id"
 
-# Named connection with custom scopes
-$AUTHSOME login github --connection work --scopes repo,read:org
-
-# API key provider (will interactively prompt)
-$AUTHSOME login openai
+# API key provider (bypass interactive prompt by passing key)
+$AUTHSOME login openai --api-key "sk-..."
 ```
 
 ### Step 2.4: Verify

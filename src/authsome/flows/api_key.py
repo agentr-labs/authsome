@@ -39,6 +39,9 @@ class ApiKeyPromptFlow(AuthFlow):
         profile: str,
         connection_name: str,
         scopes: list[str] | None = None,
+        client_id: str | None = None,
+        client_secret: str | None = None,
+        api_key: str | None = None,
     ) -> ConnectionRecord:
         """Prompt the user for an API key and create a connection record."""
         if provider.api_key is None:
@@ -47,18 +50,21 @@ class ApiKeyPromptFlow(AuthFlow):
                 provider=provider.name,
             )
 
-        # Prompt securely
-        prompt_text = f"Enter API key for {provider.display_name}: "
-        try:
-            api_key_value = getpass.getpass(prompt_text)
-        except (EOFError, KeyboardInterrupt) as exc:
-            raise AuthenticationFailedError(
-                "API key input cancelled",
-                provider=provider.name,
-            ) from exc
+        api_key_value = api_key
+
+        if not api_key_value:
+            # Prompt securely
+            prompt_text = f"Enter API key for {provider.display_name}: "
+            try:
+                api_key_value = getpass.getpass(prompt_text)
+            except (EOFError, KeyboardInterrupt) as exc:
+                raise AuthenticationFailedError(
+                    "API key input cancelled",
+                    provider=provider.name,
+                ) from exc
 
         # Validate non-empty
-        if not api_key_value.strip():
+        if not api_key_value or not api_key_value.strip():
             raise AuthenticationFailedError(
                 "API key cannot be empty",
                 provider=provider.name,
@@ -101,6 +107,9 @@ class ApiKeyEnvFlow(AuthFlow):
         profile: str,
         connection_name: str,
         scopes: list[str] | None = None,
+        client_id: str | None = None,
+        client_secret: str | None = None,
+        api_key: str | None = None,
     ) -> ConnectionRecord:
         """Read an API key from environment and create a connection record."""
         if provider.api_key is None:
@@ -109,19 +118,22 @@ class ApiKeyEnvFlow(AuthFlow):
                 provider=provider.name,
             )
 
-        env_var = provider.api_key.env_var
-        if not env_var:
-            raise AuthenticationFailedError(
-                "Provider does not define an env_var for API key import",
-                provider=provider.name,
-            )
+        api_key_value = api_key
 
-        api_key_value = os.environ.get(env_var)
         if not api_key_value:
-            raise CredentialMissingError(
-                f"Environment variable '{env_var}' is not set or empty",
-                provider=provider.name,
-            )
+            env_var = provider.api_key.env_var
+            if not env_var:
+                raise AuthenticationFailedError(
+                    "Provider does not define an env_var for API key import",
+                    provider=provider.name,
+                )
+
+            api_key_value = os.environ.get(env_var)
+            if not api_key_value:
+                raise CredentialMissingError(
+                    f"Environment variable '{env_var}' is not set or empty",
+                    provider=provider.name,
+                )
 
         # Encrypt the key
         encrypted_key = crypto.encrypt(api_key_value)

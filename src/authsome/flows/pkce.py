@@ -111,6 +111,9 @@ class PkceFlow(AuthFlow):
         profile: str,
         connection_name: str,
         scopes: list[str] | None = None,
+        client_id: str | None = None,
+        client_secret: str | None = None,
+        api_key: str | None = None,
     ) -> ConnectionRecord:
         """Execute the PKCE authorization code flow."""
         if provider.oauth is None:
@@ -119,18 +122,10 @@ class PkceFlow(AuthFlow):
                 provider=provider.name,
             )
 
-        # Resolve client credentials from provider definition
-        client_id: str | None = None
-        client_secret: str | None = None
-
-        if provider.client:
-            client_id = provider.client.resolve_client_id()
-            client_secret = provider.client.resolve_client_secret()
-
         if not client_id:
             raise AuthenticationFailedError(
-                "PKCE flow requires a client_id in the provider's 'client' config "
-                "(or set via the env: prefix). Use dcr_pkce flow for dynamic registration.",
+                "PKCE flow requires a client_id. Please pass it via the --client-id flag, "
+                "or ensure it's saved in your profile store.",
                 provider=provider.name,
             )
 

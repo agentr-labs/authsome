@@ -185,9 +185,23 @@ def list_cmd(ctx_obj: ContextObj) -> None:
 @click.option("--connection", default="default", help="Connection name.")
 @click.option("--flow", help="Authentication flow override.")
 @click.option("--scopes", help="Comma-separated scopes to request.")
+@click.option("--client-id", help="Provider Client ID")
+@click.option("--client-secret", help="Provider Client Secret")
+@click.option("--api-key", help="Provider API Key")
+@click.option("--force", is_flag=True, help="Force override existing client credentials.")
 @pass_ctx
 @handle_errors
-def login(ctx_obj: ContextObj, provider: str, connection: str, flow: str | None, scopes: str | None) -> None:
+def login(
+    ctx_obj: ContextObj,
+    provider: str,
+    connection: str,
+    flow: str | None,
+    scopes: str | None,
+    client_id: str | None,
+    client_secret: str | None,
+    api_key: str | None,
+    force: bool,
+) -> None:
     """Authenticate with a provider using its configured flow."""
     client = ctx_obj.initialize_client()
     flow_enum = FlowType(flow) if flow else None
@@ -201,6 +215,10 @@ def login(ctx_obj: ContextObj, provider: str, connection: str, flow: str | None,
         connection_name=connection,
         scopes=scope_list,
         flow_override=flow_enum,
+        client_id=client_id,
+        client_secret=client_secret,
+        api_key=api_key,
+        force=force,
     )
 
     if ctx_obj.json_output:

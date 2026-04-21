@@ -55,6 +55,9 @@ class DeviceCodeFlow(AuthFlow):
         profile: str,
         connection_name: str,
         scopes: list[str] | None = None,
+        client_id: str | None = None,
+        client_secret: str | None = None,
+        api_key: str | None = None,
     ) -> ConnectionRecord:
         """Execute the device code authorization flow."""
         if provider.oauth is None:
@@ -70,17 +73,10 @@ class DeviceCodeFlow(AuthFlow):
                 provider=provider.name,
             )
 
-        # Resolve client credentials
-        client_id: str | None = None
-        client_secret: str | None = None
-
-        if provider.client:
-            client_id = provider.client.resolve_client_id()
-            client_secret = provider.client.resolve_client_secret()
-
         if not client_id:
             raise AuthenticationFailedError(
-                "Device code flow requires a client_id in the provider's 'client' config.",
+                "Device code flow requires a client_id. Please pass it via the --client-id flag, "
+                "or ensure it's saved in your profile store.",
                 provider=provider.name,
             )
 

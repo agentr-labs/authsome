@@ -238,3 +238,5 @@ __marimo__/
 .trae/
 .windsurf/
 .zencoder/
+
+.DS_Store

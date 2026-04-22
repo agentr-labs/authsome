@@ -6,7 +6,6 @@ Spec §13.5: API Key Environment Import — read from environment variable, stor
 
 from __future__ import annotations
 
-
 import logging
 
 from authsome.crypto.base import CryptoBackend
@@ -82,5 +81,3 @@ class ApiKeyFlow(AuthFlow):
             account=AccountInfo(),
             metadata={},
         )
-
-

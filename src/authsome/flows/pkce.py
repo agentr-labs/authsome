@@ -104,6 +104,8 @@ class PkceFlow(AuthFlow):
     `client` section (either literal or env:-prefixed).
     """
 
+    callback_port: int = 7999
+
     def authenticate(
         self,
         provider: ProviderDefinition,
@@ -135,7 +137,7 @@ class PkceFlow(AuthFlow):
         code_verifier, code_challenge = _generate_pkce()
 
         # Start local callback server
-        port = 7999
+        port = self.callback_port
         redirect_uri = f"http://127.0.0.1:{port}/callback"
 
         # Reset handler state
@@ -147,29 +149,31 @@ class PkceFlow(AuthFlow):
         server_thread = threading.Thread(target=server.handle_request, daemon=True)
         server_thread.start()
 
-        # Build authorization URL
-        state = secrets.token_urlsafe(32)
-        auth_params: dict[str, str] = {
-            "response_type": "code",
-            "client_id": client_id,
-            "redirect_uri": redirect_uri,
-            "state": state,
-            "code_challenge": code_challenge,
-            "code_challenge_method": "S256",
-        }
-        if effective_scopes:
-            auth_params["scope"] = " ".join(effective_scopes)
+        try:
+            # Build authorization URL
+            state = secrets.token_urlsafe(32)
+            auth_params: dict[str, str] = {
+                "response_type": "code",
+                "client_id": client_id,
+                "redirect_uri": redirect_uri,
+                "state": state,
+                "code_challenge": code_challenge,
+                "code_challenge_method": "S256",
+            }
+            if effective_scopes:
+                auth_params["scope"] = " ".join(effective_scopes)
 
-        auth_url = f"{provider.oauth.authorization_url}?{urllib.parse.urlencode(auth_params)}"
+            auth_url = f"{provider.oauth.authorization_url}?{urllib.parse.urlencode(auth_params)}"
 
-        logger.info("Opening browser for authorization...")
-        print(f"\nOpening browser for {provider.display_name} authorization...")
-        print(f"If the browser doesn't open, visit:\n{auth_url}\n")
-        webbrowser.open(auth_url)
+            logger.info("Opening browser for authorization...")
+            print(f"\nOpening browser for {provider.display_name} authorization...")
+            print(f"If the browser doesn't open, visit:\n{auth_url}\n")
+            webbrowser.open(auth_url)
 
-        # Wait for callback
-        server_thread.join(timeout=_CALLBACK_TIMEOUT_SECONDS)
-        server.server_close()
+            # Wait for callback
+            server_thread.join(timeout=_CALLBACK_TIMEOUT_SECONDS)
+        finally:
+            server.server_close()
 
         if _CallbackHandler.error:
             raise AuthenticationFailedError(

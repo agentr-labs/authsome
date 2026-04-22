@@ -117,4 +117,3 @@ class ProviderClientRecord(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     model_config = {"extra": "allow"}
-

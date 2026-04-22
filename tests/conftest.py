@@ -1,7 +1,8 @@
 import http.server
-import pytest
 import socket
 import time
+
+import pytest
 
 # Set global reuse flags on the class itself
 http.server.HTTPServer.allow_reuse_address = True

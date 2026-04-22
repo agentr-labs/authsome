@@ -257,6 +257,7 @@ def test_pkce_flow_timeout(tmp_path):
     crypto = LocalFileCryptoBackend(tmp_path)
     provider = _make_provider()
     flow = PkceFlow()
+    flow.callback_port = _find_free_port()
 
     def mock_open(url):
         # Do nothing to simulate timeout

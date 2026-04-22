@@ -311,12 +311,14 @@ def test_exchange_code_invalid_json(tmp_path):
     crypto = LocalFileCryptoBackend(tmp_path)
     provider = _make_provider()
     flow = DcrPkceFlow()
+    flow.callback_port = _find_free_port()
+    port = flow.callback_port
 
     def mock_open(url):
         parsed = urllib.parse.urlparse(url)
         params = urllib.parse.parse_qs(parsed.query)
         state = params["state"][0]
-        urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:7999/callback?code=mock_code&state={state}"))
+        urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{port}/callback?code=mock_code&state={state}"))
 
     mock_resp = MagicMock()
     mock_resp.json.side_effect = json.JSONDecodeError("msg", "doc", 0)
@@ -331,12 +333,14 @@ def test_exchange_code_missing_access_token(tmp_path):
     crypto = LocalFileCryptoBackend(tmp_path)
     provider = _make_provider()
     flow = DcrPkceFlow()
+    flow.callback_port = _find_free_port()
+    port = flow.callback_port
 
     def mock_open(url):
         parsed = urllib.parse.urlparse(url)
         params = urllib.parse.parse_qs(parsed.query)
         state = params["state"][0]
-        urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:7999/callback?code=mock_code&state={state}"))
+        urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{port}/callback?code=mock_code&state={state}"))
 
     mock_resp = MagicMock()
     mock_resp.json.return_value = {"error": "invalid_grant", "error_description": "bad code"}

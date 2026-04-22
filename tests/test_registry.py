@@ -19,7 +19,7 @@ def _make_api_key_provider(name: str = "testprov") -> ProviderDefinition:
         name=name,
         display_name=f"Test {name}",
         auth_type=AuthType.API_KEY,
-        flow=FlowType.API_KEY_PROMPT,
+        flow=FlowType.API_KEY,
         api_key=ApiKeyConfig(env_var=f"{name.upper()}_KEY"),
     )
 
@@ -101,7 +101,7 @@ class TestProviderRegistry:
             name="openai",
             display_name="Custom OpenAI",
             auth_type=AuthType.API_KEY,
-            flow=FlowType.API_KEY_PROMPT,
+            flow=FlowType.API_KEY,
             api_key=ApiKeyConfig(
                 header_name="X-Custom",
                 header_prefix="Key",
@@ -147,7 +147,7 @@ class TestProviderRegistry:
             name="noapikey",
             display_name="No API Key",
             auth_type=AuthType.API_KEY,
-            flow=FlowType.API_KEY_PROMPT,
+            flow=FlowType.API_KEY,
             # Missing api_key section
         )
         with pytest.raises(InvalidProviderSchemaError, match="requires an 'api_key'"):

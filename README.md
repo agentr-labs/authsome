@@ -4,6 +4,7 @@
 [![Python 3.13+](https://img.shields.io/pypi/pyversions/authsome.svg)](https://pypi.org/project/authsome/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![PyPI downloads](https://img.shields.io/pypi/dm/authsome.svg)](https://pypi.org/project/authsome/)
+[![Tests](https://github.com/manojbajaj95/authsome/actions/workflows/test.yml/badge.svg)](https://github.com/manojbajaj95/authsome/actions/workflows/test.yml)
 
 ```text
               __  __

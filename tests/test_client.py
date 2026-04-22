@@ -97,7 +97,7 @@ class TestAuthClientProviders:
             name="custom",
             display_name="Custom Provider",
             auth_type=AuthType.API_KEY,
-            flow=FlowType.API_KEY_PROMPT,
+            flow=FlowType.API_KEY,
             api_key=ApiKeyConfig(env_var="CUSTOM_KEY"),
         )
         client.register_provider(custom)
@@ -147,7 +147,7 @@ class TestAuthClientApiKeyLogin:
         return c
 
     def test_api_key_login_and_get(self, client: AuthClient) -> None:
-        with patch("authsome.flows.api_key.getpass.getpass", return_value="sk-test-123"):
+        with patch("authsome.flows.bridge.secure_input_bridge", return_value={"api_key": "sk-test-123"}):
             record = client.login("openai")
 
         assert record.status == ConnectionStatus.CONNECTED
@@ -158,14 +158,14 @@ class TestAuthClientApiKeyLogin:
         assert conn.status == ConnectionStatus.CONNECTED
 
     def test_api_key_get_access_token(self, client: AuthClient) -> None:
-        with patch("authsome.flows.api_key.getpass.getpass", return_value="sk-test-456"):
+        with patch("authsome.flows.bridge.secure_input_bridge", return_value={"api_key": "sk-test-456"}):
             client.login("openai")
 
         token = client.get_access_token("openai")
         assert token == "sk-test-456"
 
     def test_api_key_get_auth_headers(self, client: AuthClient) -> None:
-        with patch("authsome.flows.api_key.getpass.getpass", return_value="sk-test-789"):
+        with patch("authsome.flows.bridge.secure_input_bridge", return_value={"api_key": "sk-test-789"}):
             client.login("openai")
 
         headers = client.get_auth_headers("openai")
@@ -173,10 +173,10 @@ class TestAuthClientApiKeyLogin:
         assert headers["Authorization"] == "Bearer sk-test-789"
 
     def test_api_key_multiple_connections(self, client: AuthClient) -> None:
-        with patch("authsome.flows.api_key.getpass.getpass", return_value="key-1"):
+        with patch("authsome.flows.bridge.secure_input_bridge", return_value={"api_key": "key-1"}):
             client.login("openai", connection_name="personal")
 
-        with patch("authsome.flows.api_key.getpass.getpass", return_value="key-2"):
+        with patch("authsome.flows.bridge.secure_input_bridge", return_value={"api_key": "key-2"}):
             client.login("openai", connection_name="work")
 
         assert client.get_access_token("openai", connection="personal") == "key-1"
@@ -198,21 +198,21 @@ class TestAuthClientExport:
         return c
 
     def test_export_env_format(self, client: AuthClient) -> None:
-        with patch("authsome.flows.api_key.getpass.getpass", return_value="sk-export"):
+        with patch("authsome.flows.bridge.secure_input_bridge", return_value={"api_key": "sk-export"}):
             client.login("openai")
 
         output = client.export("openai", format=ExportFormat.ENV)
         assert "OPENAI_API_KEY=sk-export" in output
 
     def test_export_shell_format(self, client: AuthClient) -> None:
-        with patch("authsome.flows.api_key.getpass.getpass", return_value="sk-shell"):
+        with patch("authsome.flows.bridge.secure_input_bridge", return_value={"api_key": "sk-shell"}):
             client.login("openai")
 
         output = client.export("openai", format=ExportFormat.SHELL)
         assert "export OPENAI_API_KEY=sk-shell" in output
 
     def test_export_json_format(self, client: AuthClient) -> None:
-        with patch("authsome.flows.api_key.getpass.getpass", return_value="sk-json"):
+        with patch("authsome.flows.bridge.secure_input_bridge", return_value={"api_key": "sk-json"}):
             client.login("openai")
 
         output = client.export("openai", format=ExportFormat.JSON)
@@ -231,7 +231,7 @@ class TestAuthClientRemoveRevoke:
         return c
 
     def test_remove_connection(self, client: AuthClient) -> None:
-        with patch("authsome.flows.api_key.getpass.getpass", return_value="key"):
+        with patch("authsome.flows.bridge.secure_input_bridge", return_value={"api_key": "key"}):
             client.login("openai")
 
         client.remove("openai")
@@ -240,18 +240,17 @@ class TestAuthClientRemoveRevoke:
             client.get_connection("openai")
 
     def test_remove_nonexistent(self, client: AuthClient) -> None:
-        with pytest.raises(ConnectionNotFoundError):
-            client.remove("openai")
+        # Removing when no connections exist should succeed safely
+        client.remove("openai")
 
     def test_revoke_connection(self, client: AuthClient) -> None:
-        with patch("authsome.flows.api_key.getpass.getpass", return_value="key"):
+        with patch("authsome.flows.bridge.secure_input_bridge", return_value={"api_key": "key"}):
             client.login("openai")
 
         client.revoke("openai")
 
-        conn = client.get_connection("openai")
-        assert conn.status == ConnectionStatus.REVOKED
-        assert conn.api_key is None
+        with pytest.raises(ConnectionNotFoundError):
+            client.get_connection("openai")
 
 
 class TestAuthClientDoctor:
@@ -288,7 +287,7 @@ class TestAuthClientListConnections:
         assert connections == []
 
     def test_list_connections_after_login(self, client: AuthClient) -> None:
-        with patch("authsome.flows.api_key.getpass.getpass", return_value="key"):
+        with patch("authsome.flows.bridge.secure_input_bridge", return_value={"api_key": "key"}):
             client.login("openai")
 
         connections = client.list_connections()

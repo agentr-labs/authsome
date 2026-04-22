@@ -30,6 +30,9 @@ jobs:
           ruff check src/ tests/
           ruff format --check src/ tests/
           
+      - name: Type check with ty
+        run: ty check src/
+          
       - name: Run tests with coverage
         run: pytest --cov=authsome --cov-report=xml --cov-report=term
         

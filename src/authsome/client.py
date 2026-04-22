@@ -967,7 +967,9 @@ class AuthClient:
             if record.refresh_token:
                 try:
                     refreshed = self._refresh_token(record, provider)
-                    return self.crypto.decrypt(refreshed.access_token)  # type: ignore[arg-type]
+                    if refreshed.access_token is None:
+                        raise RefreshFailedError("Refreshed record missing access token", provider=provider)
+                    return self.crypto.decrypt(refreshed.access_token)
                 except RefreshFailedError:
                     # Check if the token hasn't actually expired yet
                     if now < record.expires_at:

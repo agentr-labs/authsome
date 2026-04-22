@@ -83,3 +83,55 @@ class TestSQLiteStore:
         key = "profile:default:my-provider:connection:test_conn-1"
         store.set(key, '{"ok": true}')
         assert store.get(key) == '{"ok": true}'
+
+    def test_connect_error(self, tmp_path: Path) -> None:
+        profile_dir = tmp_path / "profiles" / "bad"
+        profile_dir.mkdir(parents=True)
+        # Create a directory where the db file should be to trigger an error
+        (profile_dir / "store.db").mkdir()
+        from authsome.errors import StoreUnavailableError
+
+        with pytest.raises(StoreUnavailableError):
+            SQLiteStore(profile_dir)
+
+    def test_ensure_connection_error(self, store: SQLiteStore) -> None:
+        from authsome.errors import StoreUnavailableError
+
+        store.close()
+        with pytest.raises(StoreUnavailableError, match="Store connection is closed"):
+            store.get("key1")
+
+    def test_lock_acquire_release_errors(self, store: SQLiteStore, monkeypatch: pytest.MonkeyPatch) -> None:
+        # Mock fcntl to raise OSError
+        import fcntl
+
+        def mock_flock(fd, operation):
+            raise OSError("Mock error")
+
+        monkeypatch.setattr(fcntl, "flock", mock_flock)
+
+        # lock acquire should catch OSError and just log warning
+        store._acquire_lock()
+        assert store._lock_fd is not None
+
+        # lock release should catch OSError
+        store._release_lock()
+        assert store._lock_fd is None
+
+    def test_double_acquire(self, store: SQLiteStore) -> None:
+        store._acquire_lock()
+        fd1 = store._lock_fd
+        store._acquire_lock()  # should early return
+        assert store._lock_fd is fd1
+        store._release_lock()
+
+    def test_close_sqlite_error(self, store: SQLiteStore) -> None:
+        import sqlite3
+
+        class MockConn:
+            def close(self):
+                raise sqlite3.Error("Mock error")
+
+        store._conn = MockConn()
+        store.close()  # should suppress error
+        assert store._conn is None

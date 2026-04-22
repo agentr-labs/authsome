@@ -49,6 +49,8 @@ class TestProviderRegistry:
         return ProviderRegistry(home)
 
     def test_list_providers_empty(self, registry: ProviderRegistry) -> None:
+        # Also remove providers dir to hit line 222
+        registry._providers_dir.rmdir()
         providers = registry.list_providers()
         # Should have bundled providers
         assert isinstance(providers, list)
@@ -59,6 +61,16 @@ class TestProviderRegistry:
         # Our bundled providers should be present
         assert "openai" in names
         assert "github" in names
+
+    def test_list_providers_by_source(self, registry: ProviderRegistry) -> None:
+        provider = _make_api_key_provider("customprov")
+        registry.register_provider(provider)
+
+        sources = registry.list_providers_by_source()
+        assert "bundled" in sources
+        assert "custom" in sources
+        assert any(p.name == "customprov" for p in sources["custom"])
+        assert any(p.name == "openai" for p in sources["bundled"])
 
     def test_get_bundled_provider(self, registry: ProviderRegistry) -> None:
         provider = registry.get_provider("openai")
@@ -166,3 +178,78 @@ class TestProviderRegistry:
         )
         with pytest.raises(InvalidProviderSchemaError, match="Invalid URL"):
             registry.register_provider(provider)
+
+    def test_register_oauth_provider(self, registry: ProviderRegistry) -> None:
+        # This covers 204->exit and 195->exit
+        provider = _make_oauth_provider("goodoauth")
+        registry.register_provider(provider)
+        loaded = registry.get_provider("goodoauth")
+        assert loaded.auth_type == AuthType.OAUTH2
+
+    def test_validate_oauth_missing_optional_url(self, registry: ProviderRegistry) -> None:
+        # Test 197->195 where a URL field is explicitly empty string
+        provider = _make_oauth_provider("opturl")
+        provider.oauth.token_url = ""  # type: ignore
+        # It won't fail validation on the empty URL, but it might fail on register or be fine
+        registry.register_provider(provider)
+
+    def test_list_providers_with_local(self, registry: ProviderRegistry) -> None:
+        # Test line 71: list_providers loading local providers
+        registry.register_provider(_make_api_key_provider("localprov"))
+        providers = registry.list_providers()
+        assert any(p.name == "localprov" for p in providers)
+
+    def test_unrecognized_auth_type(self, registry: ProviderRegistry) -> None:
+        provider = _make_api_key_provider()
+        # Bypass Pydantic validation to simulate invalid auth_type from storage
+        object.__setattr__(provider, "auth_type", "INVALID_TYPE")
+        with pytest.raises(InvalidProviderSchemaError, match="Unrecognized auth_type"):
+            registry._validate_provider(provider)
+
+    def test_load_provider_file_error(self, registry: ProviderRegistry) -> None:
+        # Test 215-216
+        registry._providers_dir.mkdir(parents=True, exist_ok=True)
+        bad_file = registry._providers_dir / "bad.json"
+        bad_file.write_text("invalid json")
+
+        with pytest.raises(InvalidProviderSchemaError, match="Failed to parse provider file"):
+            registry._load_provider_file(bad_file)
+
+    def test_load_local_providers_error_skipping(self, registry: ProviderRegistry) -> None:
+        # Test 225-229
+        registry._providers_dir.mkdir(parents=True, exist_ok=True)
+        bad_file = registry._providers_dir / "bad.json"
+        bad_file.write_text("invalid json")
+
+        providers = registry._load_local_providers()
+        assert "bad" not in providers
+
+    def test_load_bundled_providers_errors(self, registry: ProviderRegistry, monkeypatch: pytest.MonkeyPatch) -> None:
+        # Test 243-246
+        import importlib.resources
+
+        # Test ModuleNotFoundError
+        def mock_files_error(*args, **kwargs):
+            raise ModuleNotFoundError()
+
+        monkeypatch.setattr(importlib.resources, "files", mock_files_error)
+        assert registry._load_bundled_providers() == {}
+
+        # Test JSONDecodeError inside bundled providers
+        monkeypatch.undo()
+
+        class MockResource:
+            name = "bad.json"
+
+            def read_text(self, *args, **kwargs):
+                return "bad json"
+
+        class MockPkg:
+            def iterdir(self):
+                return [MockResource()]
+
+        def mock_files_success(*args, **kwargs):
+            return MockPkg()
+
+        monkeypatch.setattr(importlib.resources, "files", mock_files_success)
+        assert registry._load_bundled_providers() == {}

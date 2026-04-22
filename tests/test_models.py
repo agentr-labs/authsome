@@ -1,7 +1,5 @@
 """Tests for authsome data models."""
 
-import pytest
-
 from authsome.models.config import GlobalConfig
 from authsome.models.connection import (
     ConnectionRecord,
@@ -123,8 +121,6 @@ class TestProviderDefinition:
         json_str = provider.model_dump_json()
         restored = ProviderDefinition.model_validate_json(json_str)
         assert restored.name == "test"
-
-
 
 
 class TestEncryptedField:

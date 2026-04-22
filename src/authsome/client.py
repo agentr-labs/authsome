@@ -28,7 +28,6 @@ from authsome.crypto.base import CryptoBackend
 from authsome.crypto.keyring_crypto import KeyringCryptoBackend
 from authsome.crypto.local_file_crypto import LocalFileCryptoBackend
 from authsome.errors import (
-    ProviderNotFoundError,
     AuthsomeError,
     ConnectionNotFoundError,
     CredentialMissingError,
@@ -342,28 +341,38 @@ class AuthClient:
 
         # Fetch client credentials
         client_record = self.get_provider_client_credentials(provider, profile_name)
-        
+
         flow_client_id = client_record.client_id if client_record else None
-        flow_client_secret = self.crypto.decrypt(client_record.client_secret) if client_record and client_record.client_secret else None
+        flow_client_secret = (
+            self.crypto.decrypt(client_record.client_secret) if client_record and client_record.client_secret else None
+        )
         flow_api_key = None
 
         # Secure Bridge Prompts for missing interactive inputs
         missing_fields = []
         if flow_type in (FlowType.PKCE, FlowType.DEVICE_CODE) and not flow_client_id:
             missing_fields.append({"name": "client_id", "label": "Client ID", "type": "text"})
-            missing_fields.append({"name": "client_secret", "label": "Client Secret (Optional)", "type": "password", "required": False})
+            missing_fields.append(
+                {
+                    "name": "client_secret",
+                    "label": "Client Secret (Optional)",
+                    "type": "password",
+                    "required": False,
+                }
+            )
         elif flow_type == FlowType.API_KEY and not flow_api_key:
             missing_fields.append({"name": "api_key", "label": "API Key", "type": "password"})
 
         if missing_fields:
             from authsome.flows.bridge import secure_input_bridge
+
             title = f"{definition.display_name} Credentials"
             inputs = secure_input_bridge(title, missing_fields)
-            
+
             if flow_type in (FlowType.PKCE, FlowType.DEVICE_CODE):
                 flow_client_id = inputs.get("client_id")
                 secret_input = inputs.get("client_secret")
-                
+
                 if client_record is None:
                     client_record = ProviderClientRecord(
                         profile=profile_name,
@@ -396,14 +405,15 @@ class AuthClient:
                     provider=provider,
                 )
             client_record.client_id = record.metadata.pop("_dcr_client_id")
-            
+
             dcr_secret_dict = record.metadata.pop("_dcr_client_secret", None)
             if dcr_secret_dict:
                 from authsome.crypto.base import EncryptedField
+
                 client_record.client_secret = EncryptedField(**dcr_secret_dict)
             else:
                 client_record.client_secret = None
-                
+
             self._save_provider_client_credentials(client_record)
 
         # Persist the connection record
@@ -558,10 +568,10 @@ class AuthClient:
         """
         profile_name = profile or self.active_profile
         store = self._get_store(profile_name)
-        
+
         # Ensure provider exists
         self.get_provider(provider)
-        
+
         # 1. Log out of all connections for this provider to remotely revoke them
         meta_key = build_store_key(
             profile=profile_name,
@@ -574,10 +584,10 @@ class AuthClient:
             # Make a copy of the list as logout will modify it
             for conn_name in list(metadata.connection_names):
                 self.logout(provider, connection=conn_name, profile=profile_name)
-        
+
         # 2. Delete ProviderMetadataRecord
         store.delete(meta_key)
-        
+
         # 3. Delete ProviderClientRecord
         client_key = build_store_key(
             profile=profile_name,
@@ -585,7 +595,7 @@ class AuthClient:
             record_type="client",
         )
         store.delete(client_key)
-        
+
         logger.info("Revoked all credentials for provider=%s in profile=%s", provider, profile_name)
 
     def remove(
@@ -598,10 +608,10 @@ class AuthClient:
         Removes all local credential state and deletes the provider JSON file if it exists locally.
         """
         profile_name = profile or self.active_profile
-        
+
         # Revoke all credentials (cleans up connections and client secrets)
         self.revoke(provider, profile=profile_name)
-        
+
         # Delete the provider definition JSON if it's a local/custom provider
         local_path = self._home / "providers" / f"{provider}.json"
         if local_path.exists():
@@ -680,7 +690,7 @@ class AuthClient:
                 if "=" in line:
                     key, value = line.split("=", 1)
                     env[key] = value
-                    
+
         def _dquote(s: str) -> str:
             """Double-quote a token so $VAR references are expanded by the shell."""
             s = s.replace("\\", "\\\\")
@@ -1001,7 +1011,7 @@ class AuthClient:
         client_record = self.get_provider_client_credentials(provider_name, record.profile)
         client_id = None
         client_secret = None
-        
+
         if client_record:
             client_id = client_record.client_id
             if client_record.client_secret:

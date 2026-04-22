@@ -72,6 +72,58 @@ class TestLocalFileCryptoBackend:
         decrypted = crypto.decrypt(encrypted)
         assert decrypted == original
 
+    def test_json_load_error(self, tmp_path: Path) -> None:
+        from authsome.errors import EncryptionUnavailableError
+
+        key_file = tmp_path / "master.key"
+        key_file.write_text("invalid json")
+        with pytest.raises(EncryptionUnavailableError, match="Failed to read local key file"):
+            LocalFileCryptoBackend(tmp_path)
+
+    def test_chmod_error(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        import os
+
+        def mock_chmod(path, mode):
+            raise OSError("Mock error")
+
+        monkeypatch.setattr(os, "chmod", mock_chmod)
+        # Should not raise
+        _ = LocalFileCryptoBackend(tmp_path)
+
+    def test_encrypt_not_initialized(self, crypto: LocalFileCryptoBackend) -> None:
+        from authsome.errors import EncryptionUnavailableError
+
+        crypto._aesgcm = None
+        with pytest.raises(EncryptionUnavailableError, match="Master key not initialized"):
+            crypto.encrypt("test")
+
+    def test_decrypt_not_initialized(self, crypto: LocalFileCryptoBackend) -> None:
+        from authsome.errors import EncryptionUnavailableError
+
+        crypto._aesgcm = None
+        with pytest.raises(EncryptionUnavailableError, match="Master key not initialized"):
+            crypto.decrypt(EncryptedField(enc=1, alg="AES-256-GCM", kid="local", nonce="a", ciphertext="b", tag="c"))
+
+    def test_decrypt_unsupported_alg(self, crypto: LocalFileCryptoBackend) -> None:
+        from authsome.errors import EncryptionUnavailableError
+
+        with pytest.raises(EncryptionUnavailableError, match="Unsupported algorithm"):
+            crypto.decrypt(EncryptedField(enc=1, alg="UNSUPPORTED", kid="local", nonce="a", ciphertext="b", tag="c"))
+
+    def test_decrypt_base64_decode_error(self, crypto: LocalFileCryptoBackend) -> None:
+        from authsome.errors import EncryptionUnavailableError
+
+        with pytest.raises(EncryptionUnavailableError, match="Failed to decode envelope"):
+            crypto.decrypt(EncryptedField(enc=1, alg="AES-256-GCM", kid="local", nonce="!@#", ciphertext="b", tag="c"))
+
+    def test_decrypt_aesgcm_error(self, crypto: LocalFileCryptoBackend) -> None:
+        from authsome.errors import EncryptionUnavailableError
+
+        with pytest.raises(EncryptionUnavailableError, match="Decryption failed"):
+            crypto.decrypt(
+                EncryptedField(enc=1, alg="AES-256-GCM", kid="local", nonce="abcd", ciphertext="abcd", tag="abcd")
+            )
+
 
 class TestKeyringCryptoBackend:
     """OS Keyring crypto backend tests.
@@ -99,6 +151,91 @@ class TestKeyringCryptoBackend:
         assert field.enc == 1
         assert field.alg == "AES-256-GCM"
         assert field.kid == "local"
+
+    def test_import_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import sys
+
+        monkeypatch.setitem(sys.modules, "keyring", None)
+        from authsome.errors import EncryptionUnavailableError
+
+        with pytest.raises(EncryptionUnavailableError, match="The 'keyring' package is required"):
+            KeyringCryptoBackend()
+
+    def test_get_password_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import keyring
+
+        def mock_get(*args, **kwargs):
+            raise Exception("Mock error")
+
+        monkeypatch.setattr(keyring, "get_password", mock_get)
+        from authsome.errors import EncryptionUnavailableError
+
+        with pytest.raises(EncryptionUnavailableError, match="Failed to access OS keyring"):
+            KeyringCryptoBackend()
+
+    def test_generate_new_keyring_key(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import keyring
+
+        def mock_get(*args, **kwargs):
+            return None
+
+        def mock_set(*args, **kwargs):
+            pass
+
+        monkeypatch.setattr(keyring, "get_password", mock_get)
+        monkeypatch.setattr(keyring, "set_password", mock_set)
+        backend = KeyringCryptoBackend()
+        assert backend._master_key is not None
+
+    def test_set_password_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import keyring
+
+        def mock_get(*args, **kwargs):
+            return None
+
+        def mock_set(*args, **kwargs):
+            raise Exception("Mock error")
+
+        monkeypatch.setattr(keyring, "get_password", mock_get)
+        monkeypatch.setattr(keyring, "set_password", mock_set)
+        from authsome.errors import EncryptionUnavailableError
+
+        with pytest.raises(EncryptionUnavailableError, match="Failed to store master key"):
+            KeyringCryptoBackend()
+
+    def test_encrypt_not_initialized(self, crypto: KeyringCryptoBackend) -> None:
+        from authsome.errors import EncryptionUnavailableError
+
+        crypto._aesgcm = None
+        with pytest.raises(EncryptionUnavailableError, match="Master key not initialized"):
+            crypto.encrypt("test")
+
+    def test_decrypt_not_initialized(self, crypto: KeyringCryptoBackend) -> None:
+        from authsome.errors import EncryptionUnavailableError
+
+        crypto._aesgcm = None
+        with pytest.raises(EncryptionUnavailableError, match="Master key not initialized"):
+            crypto.decrypt(EncryptedField(enc=1, alg="AES-256-GCM", kid="local", nonce="a", ciphertext="b", tag="c"))
+
+    def test_decrypt_unsupported_alg(self, crypto: KeyringCryptoBackend) -> None:
+        from authsome.errors import EncryptionUnavailableError
+
+        with pytest.raises(EncryptionUnavailableError, match="Unsupported algorithm"):
+            crypto.decrypt(EncryptedField(enc=1, alg="UNSUPPORTED", kid="local", nonce="a", ciphertext="b", tag="c"))
+
+    def test_decrypt_base64_decode_error(self, crypto: KeyringCryptoBackend) -> None:
+        from authsome.errors import EncryptionUnavailableError
+
+        with pytest.raises(EncryptionUnavailableError, match="Failed to decode envelope"):
+            crypto.decrypt(EncryptedField(enc=1, alg="AES-256-GCM", kid="local", nonce="!@#", ciphertext="b", tag="c"))
+
+    def test_decrypt_aesgcm_error(self, crypto: KeyringCryptoBackend) -> None:
+        from authsome.errors import EncryptionUnavailableError
+
+        with pytest.raises(EncryptionUnavailableError, match="Decryption failed"):
+            crypto.decrypt(
+                EncryptedField(enc=1, alg="AES-256-GCM", kid="local", nonce="abcd", ciphertext="abcd", tag="abcd")
+            )
 
 
 class TestCrossBackendCompatibility:

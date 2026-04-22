@@ -17,7 +17,6 @@ from authsome.errors import (
     ProviderNotFoundError,
     RefreshFailedError,
     TokenExpiredError,
-    TokenExpiredError as TokenExpiredErrorAlias,  # Avoid confusion if needed, but not needed here
     UnsupportedFlowError,
 )
 from authsome.models.connection import (

@@ -104,6 +104,8 @@ class PkceFlow(AuthFlow):
     `client` section (either literal or env:-prefixed).
     """
 
+    callback_port: int = 7999
+
     def authenticate(
         self,
         provider: ProviderDefinition,
@@ -135,7 +137,7 @@ class PkceFlow(AuthFlow):
         code_verifier, code_challenge = _generate_pkce()
 
         # Start local callback server
-        port = 7999
+        port = self.callback_port
         redirect_uri = f"http://127.0.0.1:{port}/callback"
 
         # Reset handler state
@@ -143,7 +145,6 @@ class PkceFlow(AuthFlow):
         _CallbackHandler.error = None
         _CallbackHandler.state = None
 
-        http.server.HTTPServer.allow_reuse_address = True
         server = http.server.HTTPServer(("127.0.0.1", port), _CallbackHandler)
         server_thread = threading.Thread(target=server.handle_request, daemon=True)
         server_thread.start()

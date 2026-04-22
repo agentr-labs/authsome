@@ -109,6 +109,8 @@ class DcrPkceFlow(AuthFlow):
     DCR registration endpoint is discovered via .well-known if not provided.
     """
 
+    callback_port: int = 7999
+
     def authenticate(
         self,
         provider: ProviderDefinition,
@@ -139,7 +141,7 @@ class DcrPkceFlow(AuthFlow):
         code_verifier, code_challenge = _generate_pkce()
 
         # Start local callback server
-        port = 7999
+        port = self.callback_port
         redirect_uri = f"http://127.0.0.1:{port}/callback"
 
         # Reset handler state
@@ -147,7 +149,6 @@ class DcrPkceFlow(AuthFlow):
         _CallbackHandler.error = None
         _CallbackHandler.state = None
 
-        http.server.HTTPServer.allow_reuse_address = True
         server = http.server.HTTPServer(("127.0.0.1", port), _CallbackHandler)
         server_thread = threading.Thread(target=server.handle_request, daemon=True)
         server_thread.start()

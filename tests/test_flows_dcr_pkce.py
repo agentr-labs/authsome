@@ -155,6 +155,8 @@ def test_dcr_pkce_flow_success(tmp_path):
     crypto = LocalFileCryptoBackend(tmp_path)
     provider = _make_provider()
     flow = DcrPkceFlow()
+    flow.callback_port = _find_free_port()
+    port = flow.callback_port
 
     def mock_open(url):
         # Extract state from URL
@@ -163,7 +165,7 @@ def test_dcr_pkce_flow_success(tmp_path):
         state = params["state"][0]
 
         # Send callback
-        callback_url = f"http://127.0.0.1:7999/callback?code=mock_code&state={state}"
+        callback_url = f"http://127.0.0.1:{port}/callback?code=mock_code&state={state}"
         req = urllib.request.Request(callback_url)
         with urllib.request.urlopen(req) as resp:
             assert resp.status == 200
@@ -194,13 +196,15 @@ def test_dcr_pkce_flow_reuse_client(tmp_path):
     crypto = LocalFileCryptoBackend(tmp_path)
     provider = _make_provider()
     flow = DcrPkceFlow()
+    flow.callback_port = _find_free_port()
+    port = flow.callback_port
 
     def mock_open(url):
         parsed = urllib.parse.urlparse(url)
         params = urllib.parse.parse_qs(parsed.query)
         assert "scope" not in params  # No scopes passed
         state = params["state"][0]
-        callback_url = f"http://127.0.0.1:7999/callback?code=mock_code&state={state}"
+        callback_url = f"http://127.0.0.1:{port}/callback?code=mock_code&state={state}"
         urllib.request.urlopen(urllib.request.Request(callback_url))
 
     token_resp = MagicMock()
@@ -221,9 +225,11 @@ def test_dcr_pkce_flow_callback_error(tmp_path):
     crypto = LocalFileCryptoBackend(tmp_path)
     provider = _make_provider()
     flow = DcrPkceFlow()
+    flow.callback_port = _find_free_port()
+    port = flow.callback_port
 
     def mock_open(url):
-        callback_url = "http://127.0.0.1:7999/callback?error=access_denied&error_description=User%20denied"
+        callback_url = f"http://127.0.0.1:{port}/callback?error=access_denied&error_description=User%20denied"
         try:
             urllib.request.urlopen(urllib.request.Request(callback_url))
         except urllib.error.HTTPError as e:
@@ -238,9 +244,11 @@ def test_dcr_pkce_flow_callback_invalid(tmp_path):
     crypto = LocalFileCryptoBackend(tmp_path)
     provider = _make_provider()
     flow = DcrPkceFlow()
+    flow.callback_port = _find_free_port()
+    port = flow.callback_port
 
     def mock_open(url):
-        callback_url = "http://127.0.0.1:7999/callback?other=123"
+        callback_url = f"http://127.0.0.1:{port}/callback?other=123"
         try:
             urllib.request.urlopen(urllib.request.Request(callback_url))
         except urllib.error.HTTPError as e:
@@ -255,9 +263,11 @@ def test_dcr_pkce_flow_state_mismatch(tmp_path):
     crypto = LocalFileCryptoBackend(tmp_path)
     provider = _make_provider()
     flow = DcrPkceFlow()
+    flow.callback_port = _find_free_port()
+    port = flow.callback_port
 
     def mock_open(url):
-        callback_url = "http://127.0.0.1:7999/callback?code=mock_code&state=wrong"
+        callback_url = f"http://127.0.0.1:{port}/callback?code=mock_code&state=wrong"
         urllib.request.urlopen(urllib.request.Request(callback_url))
 
     with patch("authsome.flows.dcr_pkce.webbrowser.open", side_effect=mock_open):
@@ -283,11 +293,13 @@ def test_exchange_code_http_error(tmp_path):
     crypto = LocalFileCryptoBackend(tmp_path)
     provider = _make_provider()
     flow = DcrPkceFlow()
+    flow.callback_port = _find_free_port()
+    port = flow.callback_port
 
     def mock_open(url):
         parsed = urllib.parse.urlparse(url)
         state = urllib.parse.parse_qs(parsed.query)["state"][0]
-        urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:7999/callback?code=mock_code&state={state}"))
+        urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{port}/callback?code=mock_code&state={state}"))
 
     with patch("authsome.flows.dcr_pkce.webbrowser.open", side_effect=mock_open):
         with patch("authsome.flows.dcr_pkce.http_client.post", side_effect=requests.RequestException("boom")):

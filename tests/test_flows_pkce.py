@@ -69,6 +69,8 @@ def test_pkce_flow_success(tmp_path):
     crypto = LocalFileCryptoBackend(tmp_path)
     provider = _make_provider()
     flow = PkceFlow()
+    flow.callback_port = _find_free_port()
+    port = flow.callback_port
 
     def mock_open(url):
         # Extract state from URL
@@ -77,7 +79,7 @@ def test_pkce_flow_success(tmp_path):
         state = params["state"][0]
 
         # Send callback
-        callback_url = f"http://127.0.0.1:7999/callback?code=mock_code&state={state}"
+        callback_url = f"http://127.0.0.1:{port}/callback?code=mock_code&state={state}"
         req = urllib.request.Request(callback_url)
         with urllib.request.urlopen(req) as resp:
             assert resp.status == 200
@@ -107,9 +109,11 @@ def test_pkce_flow_callback_error(tmp_path):
     crypto = LocalFileCryptoBackend(tmp_path)
     provider = _make_provider()
     flow = PkceFlow()
+    flow.callback_port = _find_free_port()
+    port = flow.callback_port
 
     def mock_open(url):
-        callback_url = "http://127.0.0.1:7999/callback?error=access_denied&error_description=User%20denied"
+        callback_url = f"http://127.0.0.1:{port}/callback?error=access_denied&error_description=User%20denied"
         req = urllib.request.Request(callback_url)
         try:
             urllib.request.urlopen(req)
@@ -125,10 +129,12 @@ def test_pkce_flow_callback_invalid(tmp_path):
     crypto = LocalFileCryptoBackend(tmp_path)
     provider = _make_provider()
     flow = PkceFlow()
+    flow.callback_port = _find_free_port()
+    port = flow.callback_port
 
     def mock_open(url):
         # Missing code
-        callback_url = "http://127.0.0.1:7999/callback?other=123"
+        callback_url = f"http://127.0.0.1:{port}/callback?other=123"
         req = urllib.request.Request(callback_url)
         try:
             urllib.request.urlopen(req)
@@ -144,10 +150,12 @@ def test_pkce_flow_state_mismatch(tmp_path):
     crypto = LocalFileCryptoBackend(tmp_path)
     provider = _make_provider()
     flow = PkceFlow()
+    flow.callback_port = _find_free_port()
+    port = flow.callback_port
 
     def mock_open(url):
         # Wrong state
-        callback_url = "http://127.0.0.1:7999/callback?code=mock_code&state=wrong_state"
+        callback_url = f"http://127.0.0.1:{port}/callback?code=mock_code&state=wrong_state"
         req = urllib.request.Request(callback_url)
         with urllib.request.urlopen(req) as _:
             pass
@@ -161,11 +169,13 @@ def test_pkce_exchange_http_error(tmp_path):
     crypto = LocalFileCryptoBackend(tmp_path)
     provider = _make_provider()
     flow = PkceFlow()
+    flow.callback_port = _find_free_port()
+    port = flow.callback_port
 
     def mock_open(url):
         parsed = urllib.parse.urlparse(url)
         state = urllib.parse.parse_qs(parsed.query)["state"][0]
-        callback_url = f"http://127.0.0.1:7999/callback?code=mock_code&state={state}"
+        callback_url = f"http://127.0.0.1:{port}/callback?code=mock_code&state={state}"
         urllib.request.urlopen(urllib.request.Request(callback_url))
 
     with patch("authsome.flows.pkce.webbrowser.open", side_effect=mock_open):
@@ -178,11 +188,13 @@ def test_pkce_exchange_invalid_json(tmp_path):
     crypto = LocalFileCryptoBackend(tmp_path)
     provider = _make_provider()
     flow = PkceFlow()
+    flow.callback_port = _find_free_port()
+    port = flow.callback_port
 
     def mock_open(url):
         parsed = urllib.parse.urlparse(url)
         state = urllib.parse.parse_qs(parsed.query)["state"][0]
-        urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:7999/callback?code=mock_code&state={state}"))
+        urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{port}/callback?code=mock_code&state={state}"))
 
     mock_resp = MagicMock()
     mock_resp.json.side_effect = json.JSONDecodeError("msg", "doc", 0)
@@ -197,11 +209,13 @@ def test_pkce_exchange_missing_access_token(tmp_path):
     crypto = LocalFileCryptoBackend(tmp_path)
     provider = _make_provider()
     flow = PkceFlow()
+    flow.callback_port = _find_free_port()
+    port = flow.callback_port
 
     def mock_open(url):
         parsed = urllib.parse.urlparse(url)
         state = urllib.parse.parse_qs(parsed.query)["state"][0]
-        urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:7999/callback?code=mock_code&state={state}"))
+        urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{port}/callback?code=mock_code&state={state}"))
 
     mock_resp = MagicMock()
     mock_resp.json.return_value = {"error": "invalid_grant", "error_description": "bad code"}
@@ -219,13 +233,15 @@ def test_pkce_flow_no_scopes(tmp_path):
     # Ensure no scopes are set
     provider.oauth.scopes = None
     flow = PkceFlow()
+    flow.callback_port = _find_free_port()
+    port = flow.callback_port
 
     def mock_open(url):
         parsed = urllib.parse.urlparse(url)
         params = urllib.parse.parse_qs(parsed.query)
         assert "scope" not in params
         state = params["state"][0]
-        callback_url = f"http://127.0.0.1:7999/callback?code=mock_code&state={state}"
+        callback_url = f"http://127.0.0.1:{port}/callback?code=mock_code&state={state}"
         req = urllib.request.Request(callback_url)
         urllib.request.urlopen(req)
 

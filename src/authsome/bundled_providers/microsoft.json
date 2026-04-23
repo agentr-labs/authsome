@@ -11,7 +11,11 @@
     "device_authorization_url": "https://login.microsoftonline.com/common/oauth2/v2.0/devicecode",
     "scopes": [
       "User.Read",
-      "offline_access"
+      "offline_access",
+      "Mail.ReadWrite",
+      "Calendars.ReadWrite",
+      "Files.ReadWrite",
+      "Tasks.ReadWrite"
     ],
     "pkce": true,
     "supports_device_flow": true,

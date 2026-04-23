@@ -11,8 +11,9 @@
     "device_authorization_url": null,
     "scopes": [
       "api",
-      "read_api",
       "read_user",
+      "profile",
+      "email",
       "read_repository",
       "write_repository"
     ],

@@ -15,7 +15,8 @@
       "crm.objects.companies.read",
       "crm.objects.companies.write",
       "crm.objects.deals.read",
-      "crm.objects.deals.write"
+      "crm.objects.deals.write",
+      "crm.objects.owners.read"
     ],
     "pkce": false,
     "supports_device_flow": false,

@@ -11,7 +11,9 @@
     "device_authorization_url": null,
     "scopes": [
       "identify",
-      "email"
+      "email",
+      "guilds",
+      "connections"
     ],
     "pkce": false,
     "supports_device_flow": false,

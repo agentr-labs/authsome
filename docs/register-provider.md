@@ -42,7 +42,6 @@ Create a `.json` file using one of the templates below.
     "supports_dcr": true,
     "registration_endpoint": "https://example.com/oauth/register"
   },
-  },
   "export": {
     "env": {
       "access_token": "SERVICE_ACCESS_TOKEN",
@@ -52,7 +51,7 @@ Create a `.json` file using one of the templates below.
 }
 ```
 
-> **Note:** When DCR is available, set `"flow": "dcr_pkce"` and `"supports_dcr": true` with a `"registration_endpoint"`. For standard OAuth2 (`pkce` or `device_code`), the user will be prompted to provide the `client_id` (and `client_secret` if needed) during the login process via a secure browser bridge. Agents MUST NOT pass these using CLI flags. These will be securely saved to the profile and reused for future logins. Use `--reset` if you need to update them. Do NOT include them in the provider JSON.
+> **Note:** When DCR is available, set `"flow": "dcr_pkce"` and `"supports_dcr": true` with a `"registration_endpoint"`. For standard OAuth2 (`pkce` or `device_code`), the user will be prompted to provide the `client_id` (and `client_secret` if needed) during the login process via a secure browser bridge. Agents MUST NOT pass these using CLI flags. These will be securely saved to the profile and reused for future logins. Do NOT include them in the provider JSON.
 
 > OAuth PKCE with a manually registered app: redirect URI must be `http://127.0.0.1:7999/callback`.
 
@@ -105,14 +104,14 @@ Create a `.json` file using one of the templates below.
 | `supports_dcr` | No | Set `true` if Dynamic Client Registration is available. |
 | `registration_endpoint` | No | Required if `supports_dcr` is `true`. |
 
-### Credential Storage
+### Credential storage
 
-Authsome stores all client credentials (`client_id`, `client_secret`, `api_key`) securely at the **profile level** in its internal database. 
+Authsome stores all client credentials (`client_id`, `client_secret`, `api_key`) securely at the profile level in its internal database.
 
-1. **OAuth2:** The user will be prompted securely via a local browser bridge for the `client_id` (and `client_secret` if required) during `authsome login`.
-2. **API Keys:** The user will be prompted securely via a local browser bridge for the API key during `authsome login`.
+- **OAuth2:** The user is prompted securely via a local browser bridge for the `client_id` (and `client_secret` if required) during `authsome login`.
+- **API Keys:** The user is prompted securely via a local browser bridge for the API key during `authsome login`.
 
-Once saved, these credentials are never read from environment variables or plain-text JSON files. This ensures portability and security across different environments. Agents MUST NEVER attempt to pass or request these secrets directly.
+Once saved, credentials are never read from environment variables or plain-text files. Agents must never attempt to pass or request these secrets directly.
 
 ### API Key fields (`api_key` block)
 
@@ -129,7 +128,7 @@ The `export.env` object maps credential fields to environment variable names use
 
 ## Step 4: Choose the right flow
 
-> **Priority rule for OAuth2:** When a service supports DCR, **always prefer `dcr_pkce`**. It requires no pre-registered OAuth app or `client_id` — the path of least resistance for the user.
+> **Priority rule for OAuth2:** When a service supports DCR, always prefer `dcr_pkce`. It requires no pre-registered OAuth app or `client_id`.
 
 | `flow` value | `auth_type` | When to use |
 |--------------|-------------|-------------|
@@ -143,9 +142,9 @@ The `export.env` object maps credential fields to environment variable names use
 ## Step 5: Register the provider
 
 ```bash
-$AUTHSOME register /path/to/provider.json
+authsome register /path/to/provider.json
 ```
 
 Use `--force` to overwrite an existing provider with the same name.
 
-After registration, return to [SKILL.md](./SKILL.md) **Phase 2 — LOGIN**.
+After registration, run `authsome list` to confirm the provider appears, then proceed with `authsome login <provider>`.

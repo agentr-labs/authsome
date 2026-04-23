@@ -4,25 +4,25 @@
     {
       "id": 1,
       "prompt": "Use authsome to log into GitHub. Once connected, use the credentials to run a curl request to fetch my GitHub user profile.",
-      "expected_output": "The agent lists connections, initiates the login flow, and successfully uses authsome run to execute the curl command.",
+      "expected_output": "The agent runs authsome list, initiates the login flow for github, verifies it is connected, then uses authsome run --provider github -- curl https://api.github.com/user to fetch the profile. Does not export or echo any tokens.",
       "files": []
     },
     {
       "id": 2,
-      "prompt": "Check if I have an active OpenAI connection. If so, export the credentials to my shell and echo the first 5 characters of the API key.",
-      "expected_output": "The agent identifies the existing connection, uses eval \"$(authsome export openai --format shell)\", and handles the environment variables.",
+      "prompt": "I need to run my OpenAI-powered script at ./scripts/summarise.py. Set up auth if needed and run it.",
+      "expected_output": "The agent runs authsome list to check if openai is connected. If not connected, runs authsome login openai. Then runs authsome run --provider openai -- python ./scripts/summarise.py. Does not export or echo any credentials.",
       "files": []
     },
     {
       "id": 3,
-      "prompt": "Register a custom provider named 'acme-internal' for our internal company tool that uses an API key. Then initiate a login for it.",
-      "expected_output": "The agent successfully reads REGISTER_PROVIDER.md, generates the correct JSON structure for a custom provider, saves it to the ~/.authsome/providers/ directory, and runs authsome login acme-internal.",
+      "prompt": "Register a custom provider named 'acme-internal' for our internal company tool that uses an API key with the header X-API-Key. Then log in to it.",
+      "expected_output": "The agent fetches the provider registration guide from the raw GitHub URL, writes the API key provider JSON to /tmp/acme-internal.json, runs authsome register /tmp/acme-internal.json, then runs authsome login acme-internal. Does not place the file directly in ~/.authsome/providers/.",
       "files": []
     },
     {
       "id": 4,
       "prompt": "Can you list my last 5 starred repositories on GitHub?",
-      "expected_output": "The agent realizes it needs to authenticate with GitHub to perform this action, triggers the authsome skill to check/create connections without being explicitly asked to do so, exports the credential, and runs a curl command to GitHub API to list the starred repos.",
+      "expected_output": "The agent recognises it needs GitHub auth without being explicitly told to use authsome, runs authsome list to check connection state, logs in if needed, then runs authsome run --provider github -- curl 'https://api.github.com/user/starred?per_page=5' to fetch the results.",
       "files": []
     }
   ]

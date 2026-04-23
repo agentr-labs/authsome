@@ -1,15 +1,27 @@
 ---
 name: authsome
 version: 0.1.2
-description: This skill should be used when the user wants to "login to GitHub", "store an API key", "get authentication headers", "export credentials to the shell", "run a command with API keys injected", "register a custom OAuth provider", "manage tool tokens", or "authenticate to a third-party application". Also triggers for requests involving authenticating AI agents or securely storing/retrieving credentials using the authsome CLI.
+description: |
+  Complete OAuth2 and API key credential manager with secure browser-based authentication for 25+ platforms (GitHub, Google, OpenAI, Linear, custom providers). Features a strict three-phase workflow (SEARCH → LOGIN → USE) supporting PKCE, Device Code, and Dynamic Client Registration (DCR) flows. Provides encrypted storage, multi-profile support, automatic token refresh, custom provider registration, and zero-copy credential injection via uvx/pipx.
+  
+  WHEN TO USE: Invoke this tool immediately for ANY task requiring authenticated API access, external service integration, or credential management. Automatically detects connection states, guides login flows, and injects credentials into shell commands or environment variables.
+  
+  CRITICAL RULE: NEVER ask the user to paste secrets, API keys, passwords, or client IDs in the chat. Rely entirely on this tool's secure browser-based authentication to capture credentials.
 ---
 
 # Authsome CLI Skill
 
 Manage the credential lifecycle for tools and applications using the `authsome` CLI.
 
-> **Agent Flow:** Every credential request follows three phases in order:
-> **SEARCH** → **LOGIN** → **USE**
+## Authentication Workflow
+
+Copy this checklist and track your progress as you work:
+```
+Task Progress:
+- [ ] Phase 1: SEARCH - Find provider and connections
+- [ ] Phase 2: LOGIN - Authenticate if no connection exists
+- [ ] Phase 3: USE - Export or run with credentials
+```
 
 ---
 
@@ -56,7 +68,8 @@ This returns `bundled` and `custom` provider arrays, each with `name`, `auth_typ
 
 - **Provider found with a connected connection** → Ask the user which connection to use (or if they want a new one). If using an existing connection, skip to **Phase 3 — USE**.
 - **Provider found, no connections** → Proceed to **Phase 2 — LOGIN**.
-- **Provider NOT found** → You must create and register a custom provider. Read [REGISTER_PROVIDER.md](./REGISTER_PROVIDER.md) for the full guide, then return here for Phase 2.
+- **Provider NOT found** → You must create and register a custom provider.
+  **Creating custom providers**: See [REGISTER_PROVIDER.md](./REGISTER_PROVIDER.md) for the full guide. Once registered, return here for Phase 2.
 
 ---
 
@@ -85,7 +98,7 @@ If the user already has a `"default"` connection for this provider, ask for a na
 $AUTHSOME login <provider> [--connection <name>] [--flow <flow_type>] [--scopes <scope1,scope2>] [--force]
 ```
 
-**Note on Credentials:** `authsome` stores client IDs and secrets securely in the profile store. If this is the first time logging in with a specific provider that doesn't use Dynamic Client Registration (DCR), `authsome` will securely prompt the user for these credentials via a local browser bridge. Agents MUST NEVER ask for or pass these secrets directly. They will be securely saved and reused for subsequent logins. Use the `--force` flag to overwrite an existing connection if it already exists.
+**Note on Credentials:** `authsome` stores client IDs and secrets securely in the profile store. If this is the first time logging in with a specific provider that doesn't use Dynamic Client Registration (DCR), `authsome` will securely prompt the user for these credentials via a local browser bridge. Because `authsome` securely captures credentials via a local browser bridge, you should avoid asking the user to paste secrets or client IDs in the chat. The tool will safely store and inject them for you automatically. Use the `--force` flag to overwrite an existing connection if it already exists.
 
 **Note on Redirect URIs:** If the provider requires you to register an OAuth App manually (e.g., standard PKCE flow without DCR), make sure to configure the callback/redirect URI in the provider's developer console to exactly `http://127.0.0.1:7999/callback`.
 
@@ -111,6 +124,7 @@ $AUTHSOME get <provider> --json
 ```
 
 Confirm `status` is `"connected"`.
+**Validation Loop**: If status is NOT `"connected"`, review the error output, fix any issues, and run the login command again. Only proceed to Phase 3 when validation passes.
 
 ---
 
@@ -145,12 +159,12 @@ TOKEN=$($AUTHSOME get <provider> --field access_token)
 
 ---
 
-## Additional Resources
+## Advanced Features
 
-| Topic | File |
-|-------|------|
-| Creating & registering custom providers | [REGISTER_PROVIDER.md](./REGISTER_PROVIDER.md) |
-| Full CLI command & flag reference | [CLI_REFERENCE.md](./CLI_REFERENCE.md) |
+For deeper integrations and comprehensive tool references:
+
+**Creating custom providers**: See [REGISTER_PROVIDER.md](./REGISTER_PROVIDER.md)
+**CLI Commands**: See [CLI_REFERENCE.md](./CLI_REFERENCE.md)
 
 ---
 

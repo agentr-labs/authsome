@@ -52,9 +52,7 @@ def test_missing_oauth(tmp_path):
     provider.oauth = None
     flow = PkceFlow()
 
-    with pytest.raises(
-        AuthenticationFailedError, match="missing 'oauth' configuration"
-    ):
+    with pytest.raises(AuthenticationFailedError, match="missing 'oauth' configuration"):
         flow.authenticate(provider, crypto, "default", "default", client_id="cid")
 
 
@@ -99,9 +97,7 @@ def test_pkce_flow_success(tmp_path):
     }
 
     with patch("authsome.flows.pkce.webbrowser.open", side_effect=mock_open):
-        with patch(
-            "authsome.flows.pkce.http_client.post", return_value=mock_resp
-        ) as mock_post:
+        with patch("authsome.flows.pkce.http_client.post", return_value=mock_resp) as mock_post:
             record = flow.authenticate(
                 provider,
                 crypto,
@@ -170,9 +166,7 @@ def test_pkce_flow_state_mismatch(tmp_path):
 
     def mock_open(url):
         # Wrong state
-        callback_url = (
-            f"http://127.0.0.1:{port}/callback?code=mock_code&state=wrong_state"
-        )
+        callback_url = f"http://127.0.0.1:{port}/callback?code=mock_code&state=wrong_state"
         req = urllib.request.Request(callback_url)
         with urllib.request.urlopen(req) as _:
             pass
@@ -200,12 +194,8 @@ def test_pkce_exchange_http_error(tmp_path):
             "authsome.flows.pkce.http_client.post",
             side_effect=requests.RequestException("boom"),
         ):
-            with pytest.raises(
-                AuthenticationFailedError, match="Token exchange failed: boom"
-            ):
-                flow.authenticate(
-                    provider, crypto, "default", "default", client_id="cid"
-                )
+            with pytest.raises(AuthenticationFailedError, match="Token exchange failed: boom"):
+                flow.authenticate(provider, crypto, "default", "default", client_id="cid")
 
 
 def test_pkce_exchange_invalid_json(tmp_path):
@@ -218,23 +208,15 @@ def test_pkce_exchange_invalid_json(tmp_path):
     def mock_open(url):
         parsed = urllib.parse.urlparse(url)
         state = urllib.parse.parse_qs(parsed.query)["state"][0]
-        urllib.request.urlopen(
-            urllib.request.Request(
-                f"http://127.0.0.1:{port}/callback?code=mock_code&state={state}"
-            )
-        )
+        urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{port}/callback?code=mock_code&state={state}"))
 
     mock_resp = MagicMock()
     mock_resp.json.side_effect = json.JSONDecodeError("msg", "doc", 0)
 
     with patch("authsome.flows.pkce.webbrowser.open", side_effect=mock_open):
         with patch("authsome.flows.pkce.http_client.post", return_value=mock_resp):
-            with pytest.raises(
-                AuthenticationFailedError, match="Token response was not valid JSON"
-            ):
-                flow.authenticate(
-                    provider, crypto, "default", "default", client_id="cid"
-                )
+            with pytest.raises(AuthenticationFailedError, match="Token response was not valid JSON"):
+                flow.authenticate(provider, crypto, "default", "default", client_id="cid")
 
 
 def test_pkce_exchange_missing_access_token(tmp_path):
@@ -247,11 +229,7 @@ def test_pkce_exchange_missing_access_token(tmp_path):
     def mock_open(url):
         parsed = urllib.parse.urlparse(url)
         state = urllib.parse.parse_qs(parsed.query)["state"][0]
-        urllib.request.urlopen(
-            urllib.request.Request(
-                f"http://127.0.0.1:{port}/callback?code=mock_code&state={state}"
-            )
-        )
+        urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{port}/callback?code=mock_code&state={state}"))
 
     mock_resp = MagicMock()
     mock_resp.json.return_value = {
@@ -262,9 +240,7 @@ def test_pkce_exchange_missing_access_token(tmp_path):
     with patch("authsome.flows.pkce.webbrowser.open", side_effect=mock_open):
         with patch("authsome.flows.pkce.http_client.post", return_value=mock_resp):
             with pytest.raises(AuthenticationFailedError, match="bad code"):
-                flow.authenticate(
-                    provider, crypto, "default", "default", client_id="cid"
-                )
+                flow.authenticate(provider, crypto, "default", "default", client_id="cid")
 
 
 def test_pkce_flow_no_scopes(tmp_path):
@@ -307,6 +283,4 @@ def test_pkce_flow_timeout(tmp_path):
     with patch("authsome.flows.pkce.webbrowser.open", side_effect=mock_open):
         with patch("authsome.flows.pkce._CALLBACK_TIMEOUT_SECONDS", 0.01):
             with pytest.raises(AuthenticationFailedError, match="timed out"):
-                flow.authenticate(
-                    provider, crypto, "default", "default", client_id="cid"
-                )
+                flow.authenticate(provider, crypto, "default", "default", client_id="cid")

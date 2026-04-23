@@ -213,9 +213,7 @@ class ProviderRegistry:
             data = json.loads(path.read_text(encoding="utf-8"))
             return ProviderDefinition.model_validate(data)
         except (json.JSONDecodeError, ValueError) as exc:
-            raise InvalidProviderSchemaError(
-                f"Failed to parse provider file {path}: {exc}"
-            ) from exc
+            raise InvalidProviderSchemaError(f"Failed to parse provider file {path}: {exc}") from exc
 
     def _load_local_providers(self) -> dict[str, ProviderDefinition]:
         """Load all provider definitions from the local providers/ directory."""

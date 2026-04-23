@@ -73,9 +73,7 @@ class _BridgeHandler(http.server.BaseHTTPRequestHandler):
             value = field.get("value", "")
             val_esc = escape(value, quote=True) if value else ""
             html.append(f"<label for='{name}'>{label}</label>")
-            html.append(
-                f"<input type='{input_type}' id='{name}' name='{name}' value='{val_esc}' {required}>"
-            )
+            html.append(f"<input type='{input_type}' id='{name}' name='{name}' value='{val_esc}' {required}>")
 
         html.append("<button type='submit'>Submit Securely</button>")
         html.append("</form></body></html>")
@@ -141,9 +139,7 @@ def secure_input_bridge(title: str, fields: list[dict[str, Any]]) -> dict[str, s
 
     url = f"http://127.0.0.1:{port}"
     print(f"\nRequires secure input for: {title}")
-    print(
-        f"Opening browser for secure input...\nIf the browser doesn't open, visit:\n{url}\n"
-    )
+    print(f"Opening browser for secure input...\nIf the browser doesn't open, visit:\n{url}\n")
     webbrowser.open(url)
 
     # Wait for the server to shutdown (triggered by do_POST)

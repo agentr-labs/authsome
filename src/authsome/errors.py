@@ -7,9 +7,7 @@ Spec §19.2: Expected error categories mapped to typed exceptions.
 class AuthsomeError(Exception):
     """Base exception for all authsome errors."""
 
-    def __init__(
-        self, message: str, *, provider: str | None = None, operation: str | None = None
-    ) -> None:
+    def __init__(self, message: str, *, provider: str | None = None, operation: str | None = None) -> None:
         self.provider = provider
         self.operation = operation
         parts: list[str] = []
@@ -45,9 +43,7 @@ class UnsupportedFlowError(AuthsomeError):
 class CredentialMissingError(AuthsomeError):
     """Raised when expected credentials are not available."""
 
-    def __init__(
-        self, message: str = "Credential not found", *, provider: str | None = None
-    ) -> None:
+    def __init__(self, message: str = "Credential not found", *, provider: str | None = None) -> None:
         super().__init__(message, provider=provider)
 
 
@@ -61,9 +57,7 @@ class TokenExpiredError(AuthsomeError):
 class RefreshFailedError(AuthsomeError):
     """Raised when a token refresh attempt fails."""
 
-    def __init__(
-        self, reason: str = "Unknown error", *, provider: str | None = None
-    ) -> None:
+    def __init__(self, reason: str = "Unknown error", *, provider: str | None = None) -> None:
         super().__init__(f"Token refresh failed: {reason}", provider=provider)
 
 

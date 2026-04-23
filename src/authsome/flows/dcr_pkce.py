@@ -61,9 +61,7 @@ class _CallbackHandler(http.server.BaseHTTPRequestHandler):
                 "<h1>Authentication Successful</h1><p>You can close this window and return to the terminal.</p>",
             )
         else:
-            self._send_response(
-                400, "<h1>Invalid Callback</h1><p>Missing authorization code.</p>"
-            )
+            self._send_response(400, "<h1>Invalid Callback</h1><p>Missing authorization code.</p>")
 
     def _send_response(self, status: int, body: str) -> None:
         """Send an HTML response."""
@@ -226,12 +224,8 @@ class DcrPkceFlow(AuthFlow):
             expires_at = now + timedelta(seconds=int(expires_in))
 
         encrypted_access = crypto.encrypt(access_token)
-        encrypted_refresh = (
-            crypto.encrypt(refresh_token_val) if refresh_token_val else None
-        )
-        encrypted_client_secret = (
-            crypto.encrypt(client_secret) if client_secret else None
-        )
+        encrypted_refresh = crypto.encrypt(refresh_token_val) if refresh_token_val else None
+        encrypted_client_secret = crypto.encrypt(client_secret) if client_secret else None
 
         return ConnectionRecord(
             schema_version=1,
@@ -249,11 +243,7 @@ class DcrPkceFlow(AuthFlow):
             account=AccountInfo(),
             metadata={
                 "_dcr_client_id": client_id,
-                "_dcr_client_secret": (
-                    encrypted_client_secret.model_dump()
-                    if encrypted_client_secret
-                    else None
-                ),
+                "_dcr_client_secret": (encrypted_client_secret.model_dump() if encrypted_client_secret else None),
             },
         )
 
@@ -285,9 +275,7 @@ class DcrPkceFlow(AuthFlow):
                     metadata = resp.json()
                     reg_endpoint = metadata.get("registration_endpoint")
                     if reg_endpoint:
-                        logger.info(
-                            "Discovered registration endpoint: %s", reg_endpoint
-                        )
+                        logger.info("Discovered registration endpoint: %s", reg_endpoint)
                         return reg_endpoint
             except (http_client.RequestException, json.JSONDecodeError) as exc:
                 logger.debug("Discovery attempt failed for %s: %s", url, exc)

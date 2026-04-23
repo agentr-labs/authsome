@@ -51,20 +51,14 @@ def test_is_filesystem_safe():
 
 def test_build_store_key():
     # Test definition key
-    assert (
-        build_store_key(record_type="definition", provider="github")
-        == "provider:github:definition"
-    )
+    assert build_store_key(record_type="definition", provider="github") == "provider:github:definition"
     # Test metadata key
     assert (
         build_store_key(profile="default", provider="github", record_type="metadata")
         == "profile:default:github:metadata"
     )
     # Test state key
-    assert (
-        build_store_key(profile="default", provider="github", record_type="state")
-        == "profile:default:github:state"
-    )
+    assert build_store_key(profile="default", provider="github", record_type="state") == "profile:default:github:state"
     # Test connection key
     assert (
         build_store_key(
@@ -77,8 +71,7 @@ def test_build_store_key():
     )
     # Test client key
     assert (
-        build_store_key(profile="default", provider="github", record_type="client")
-        == "profile:default:github:client"
+        build_store_key(profile="default", provider="github", record_type="client") == "profile:default:github:client"
     )
     # Test value error
     with pytest.raises(ValueError):

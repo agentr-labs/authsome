@@ -130,9 +130,7 @@ class AuthClient:
     def crypto(self) -> CryptoBackend:
         """The encryption backend, selected by config.encryption.mode."""
         if self._crypto is None:
-            mode = (
-                self.config.encryption.mode if self.config.encryption else "local_key"
-            )
+            mode = self.config.encryption.mode if self.config.encryption else "local_key"
             if mode == "keyring":
                 self._crypto = KeyringCryptoBackend()
             else:
@@ -245,11 +243,7 @@ class AuthClient:
                             "auth_type": record.auth_type.value,
                             "status": record.status.value,
                             "scopes": record.scopes,
-                            "expires_at": (
-                                record.expires_at.isoformat()
-                                if record.expires_at
-                                else None
-                            ),
+                            "expires_at": (record.expires_at.isoformat() if record.expires_at else None),
                         }
                     )
 
@@ -329,9 +323,7 @@ class AuthClient:
         definition = self.get_provider(provider)
 
         try:
-            existing_record = self.get_connection(
-                provider, connection_name, profile_name
-            )
+            existing_record = self.get_connection(provider, connection_name, profile_name)
             if existing_record and not force:
                 raise AuthsomeError(
                     f"Connection '{connection_name}' for provider '{provider}' already exists. "
@@ -352,9 +344,7 @@ class AuthClient:
 
         flow_client_id = client_record.client_id if client_record else None
         flow_client_secret = (
-            self.crypto.decrypt(client_record.client_secret)
-            if client_record and client_record.client_secret
-            else None
+            self.crypto.decrypt(client_record.client_secret) if client_record and client_record.client_secret else None
         )
         flow_api_key = None
 
@@ -371,9 +361,7 @@ class AuthClient:
                     "value": "http://127.0.0.1:7999/callback",
                 }
             )
-            missing_fields.append(
-                {"name": "client_id", "label": "Client ID", "type": "text"}
-            )
+            missing_fields.append({"name": "client_id", "label": "Client ID", "type": "text"})
             missing_fields.append(
                 {
                     "name": "client_secret",
@@ -386,9 +374,7 @@ class AuthClient:
         if flow_type in (FlowType.PKCE, FlowType.DEVICE_CODE, FlowType.DCR_PKCE):
             if scopes is None and persisted_scopes is None:
                 default_scopes = (
-                    ",".join(definition.oauth.scopes)
-                    if definition.oauth and definition.oauth.scopes
-                    else ""
+                    ",".join(definition.oauth.scopes) if definition.oauth and definition.oauth.scopes else ""
                 )
                 missing_fields.append(
                     {
@@ -401,9 +387,7 @@ class AuthClient:
                 )
 
         if flow_type == FlowType.API_KEY and not flow_api_key:
-            missing_fields.append(
-                {"name": "api_key", "label": "API Key", "type": "password"}
-            )
+            missing_fields.append({"name": "api_key", "label": "API Key", "type": "password"})
 
         if missing_fields:
             from authsome.flows.bridge import secure_input_bridge
@@ -428,9 +412,7 @@ class AuthClient:
                 if "scopes" in inputs:
                     scopes_input = inputs.get("scopes", "").strip()
                     if scopes_input:
-                        client_record.scopes = [
-                            s.strip() for s in scopes_input.split(",") if s.strip()
-                        ]
+                        client_record.scopes = [s.strip() for s in scopes_input.split(",") if s.strip()]
                     else:
                         client_record.scopes = []
                 self._save_provider_client_credentials(client_record)
@@ -613,9 +595,7 @@ class AuthClient:
         # Update provider metadata
         self._remove_from_provider_metadata(profile_name, provider, connection)
 
-        logger.info(
-            "Logged out connection: provider=%s connection=%s", provider, connection
-        )
+        logger.info("Logged out connection: provider=%s connection=%s", provider, connection)
 
     def revoke(
         self,
@@ -712,15 +692,11 @@ class AuthClient:
         if record.auth_type == AuthType.OAUTH2:
             if record.access_token:
                 token = self.crypto.decrypt(record.access_token)
-                env_name = export_map.get(
-                    "access_token", f"{provider.upper()}_ACCESS_TOKEN"
-                )
+                env_name = export_map.get("access_token", f"{provider.upper()}_ACCESS_TOKEN")
                 values[env_name] = token
             if record.refresh_token:
                 refresh = self.crypto.decrypt(record.refresh_token)
-                env_name = export_map.get(
-                    "refresh_token", f"{provider.upper()}_REFRESH_TOKEN"
-                )
+                env_name = export_map.get("refresh_token", f"{provider.upper()}_REFRESH_TOKEN")
                 values[env_name] = refresh
 
         elif record.auth_type == AuthType.API_KEY:
@@ -756,9 +732,7 @@ class AuthClient:
         env = os.environ.copy()
 
         for pname in providers or []:
-            export_str = self.export(
-                pname, profile=profile_name, format=ExportFormat.ENV
-            )
+            export_str = self.export(pname, profile=profile_name, format=ExportFormat.ENV)
             for line in export_str.strip().split("\n"):
                 if "=" in line:
                     key, value = line.split("=", 1)
@@ -807,9 +781,7 @@ class AuthClient:
             )
             return metadata
 
-        return ProfileMetadata.model_validate_json(
-            metadata_path.read_text(encoding="utf-8")
-        )
+        return ProfileMetadata.model_validate_json(metadata_path.read_text(encoding="utf-8"))
 
     def list_profiles(self) -> list[ProfileMetadata]:
         """List all local profiles."""
@@ -823,9 +795,7 @@ class AuthClient:
                 metadata_path = profile_dir / "metadata.json"
                 if metadata_path.exists():
                     try:
-                        metadata = ProfileMetadata.model_validate_json(
-                            metadata_path.read_text(encoding="utf-8")
-                        )
+                        metadata = ProfileMetadata.model_validate_json(metadata_path.read_text(encoding="utf-8"))
                         result.append(metadata)
                     except Exception:
                         logger.warning("Skipping invalid profile: %s", profile_dir.name)
@@ -909,9 +879,7 @@ class AuthClient:
         config_path = self._home / "config.json"
         if config_path.exists():
             try:
-                return GlobalConfig.model_validate_json(
-                    config_path.read_text(encoding="utf-8")
-                )
+                return GlobalConfig.model_validate_json(config_path.read_text(encoding="utf-8"))
             except Exception:
                 logger.warning("Failed to parse config.json, using defaults")
         return GlobalConfig()
@@ -936,9 +904,7 @@ class AuthClient:
         )
         store.set(key, record.model_dump_json())
 
-    def get_provider_client_credentials(
-        self, provider: str, profile: str
-    ) -> ProviderClientRecord | None:
+    def get_provider_client_credentials(self, provider: str, profile: str) -> ProviderClientRecord | None:
         """Get the stored client credentials for a provider."""
         store = self._get_store(profile)
         key = build_store_key(
@@ -1009,9 +975,7 @@ class AuthClient:
             if connection_name in metadata.connection_names:
                 metadata.connection_names.remove(connection_name)
             if metadata.last_used_connection == connection_name:
-                metadata.last_used_connection = (
-                    metadata.connection_names[0] if metadata.connection_names else None
-                )
+                metadata.last_used_connection = metadata.connection_names[0] if metadata.connection_names else None
             store.set(meta_key, metadata.model_dump_json())
 
     def _get_api_key(self, record: ConnectionRecord) -> str:
@@ -1051,9 +1015,7 @@ class AuthClient:
                 try:
                     refreshed = self._refresh_token(record, provider)
                     if refreshed.access_token is None:
-                        raise RefreshFailedError(
-                            "Refreshed record missing access token", provider=provider
-                        )
+                        raise RefreshFailedError("Refreshed record missing access token", provider=provider)
                     return self.crypto.decrypt(refreshed.access_token)
                 except RefreshFailedError:
                     # Check if the token hasn't actually expired yet
@@ -1090,16 +1052,12 @@ class AuthClient:
             raise RefreshFailedError("No OAuth config", provider=provider_name)
 
         if record.refresh_token is None:
-            raise RefreshFailedError(
-                "No refresh token available", provider=provider_name
-            )
+            raise RefreshFailedError("No refresh token available", provider=provider_name)
 
         refresh_token_value = self.crypto.decrypt(record.refresh_token)
 
         # Retrieve profile-level provider client credentials
-        client_record = self.get_provider_client_credentials(
-            provider_name, record.profile
-        )
+        client_record = self.get_provider_client_credentials(provider_name, record.profile)
         client_id = None
         client_secret = None
 
@@ -1109,9 +1067,7 @@ class AuthClient:
                 client_secret = self.crypto.decrypt(client_record.client_secret)
 
         if not client_id:
-            raise RefreshFailedError(
-                "No client_id available for refresh", provider=provider_name
-            )
+            raise RefreshFailedError("No client_id available for refresh", provider=provider_name)
 
         # Update provider state
         state_record = self._get_or_create_provider_state(record.profile, provider_name)

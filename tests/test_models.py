@@ -51,9 +51,7 @@ class TestGlobalConfig:
         assert restored.default_profile == "work"
 
     def test_extra_fields_preserved(self) -> None:
-        config = GlobalConfig.model_validate(
-            {"spec_version": 1, "default_profile": "x", "custom": "val"}
-        )
+        config = GlobalConfig.model_validate({"spec_version": 1, "default_profile": "x", "custom": "val"})
         dumped = config.model_dump()
         assert dumped.get("custom") == "val"
 

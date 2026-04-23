@@ -61,9 +61,7 @@ class _CallbackHandler(http.server.BaseHTTPRequestHandler):
                 "<h1>Authentication Successful</h1><p>You can close this window and return to the terminal.</p>",
             )
         else:
-            self._send_response(
-                400, "<h1>Invalid Callback</h1><p>Missing authorization code.</p>"
-            )
+            self._send_response(400, "<h1>Invalid Callback</h1><p>Missing authorization code.</p>")
 
     def _send_response(self, status: int, body: str) -> None:
         self.send_response(status)
@@ -219,9 +217,7 @@ class PkceFlow(AuthFlow):
             expires_at = now + timedelta(seconds=int(expires_in))
 
         encrypted_access = crypto.encrypt(access_token_val)
-        encrypted_refresh = (
-            crypto.encrypt(refresh_token_val) if refresh_token_val else None
-        )
+        encrypted_refresh = crypto.encrypt(refresh_token_val) if refresh_token_val else None
 
         return ConnectionRecord(
             schema_version=1,

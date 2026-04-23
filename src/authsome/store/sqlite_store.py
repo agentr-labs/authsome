@@ -65,9 +65,7 @@ class SQLiteStore(CredentialStore):
             self._conn.execute(_SCHEMA_SQL)
             self._conn.commit()
         except sqlite3.Error as exc:
-            raise StoreUnavailableError(
-                f"Failed to open store at {self._db_path}: {exc}"
-            ) from exc
+            raise StoreUnavailableError(f"Failed to open store at {self._db_path}: {exc}") from exc
 
     def _acquire_lock(self) -> None:
         """Acquire an advisory write lock on the profile directory."""

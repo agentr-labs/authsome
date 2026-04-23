@@ -34,9 +34,7 @@ def test_missing_oauth(tmp_path):
     provider.oauth = None
     flow = DeviceCodeFlow()
 
-    with pytest.raises(
-        AuthenticationFailedError, match="missing 'oauth' configuration"
-    ):
+    with pytest.raises(AuthenticationFailedError, match="missing 'oauth' configuration"):
         flow.authenticate(provider, crypto, "default", "default", client_id="cid")
 
 
@@ -46,9 +44,7 @@ def test_missing_device_url(tmp_path):
     provider.oauth.device_authorization_url = None
     flow = DeviceCodeFlow()
 
-    with pytest.raises(
-        AuthenticationFailedError, match="not have a device_authorization_url"
-    ):
+    with pytest.raises(AuthenticationFailedError, match="not have a device_authorization_url"):
         flow.authenticate(provider, crypto, "default", "default", client_id="cid")
 
 
@@ -70,9 +66,7 @@ def test_request_device_code_http_error(tmp_path):
         "authsome.flows.device_code.requests.post",
         side_effect=requests.RequestException("boom"),
     ):
-        with pytest.raises(
-            AuthenticationFailedError, match="Device authorization request failed"
-        ):
+        with pytest.raises(AuthenticationFailedError, match="Device authorization request failed"):
             flow.authenticate(provider, crypto, "default", "default", client_id="cid")
 
 
@@ -121,12 +115,8 @@ def test_poll_for_token_timeout(tmp_path):
         with patch("authsome.flows.device_code.time.sleep"):
             with patch("authsome.flows.device_code.time.monotonic", side_effect=[0, 2]):
                 # loop runs once and then deadline is past
-                with pytest.raises(
-                    AuthenticationFailedError, match="Device authorization timed out"
-                ):
-                    flow.authenticate(
-                        provider, crypto, "default", "default", client_id="cid"
-                    )
+                with pytest.raises(AuthenticationFailedError, match="Device authorization timed out"):
+                    flow.authenticate(provider, crypto, "default", "default", client_id="cid")
 
 
 def test_poll_for_token_success_and_errors(tmp_path):
@@ -173,9 +163,7 @@ def test_poll_for_token_success_and_errors(tmp_path):
         token_success,  # Poll 5: success
     ]
 
-    with patch(
-        "authsome.flows.device_code.requests.post", side_effect=mock_post_responses
-    ):
+    with patch("authsome.flows.device_code.requests.post", side_effect=mock_post_responses):
         with patch("authsome.flows.device_code.time.sleep") as mock_sleep:
             with patch(
                 "authsome.flows.device_code.time.monotonic",
@@ -225,9 +213,7 @@ def test_poll_for_token_access_denied(tmp_path):
         with patch("authsome.flows.device_code.time.sleep"):
             with patch("authsome.flows.device_code.time.monotonic", side_effect=[0, 0]):
                 with pytest.raises(AuthenticationFailedError, match="User denied"):
-                    flow.authenticate(
-                        provider, crypto, "default", "default", client_id="cid"
-                    )
+                    flow.authenticate(provider, crypto, "default", "default", client_id="cid")
 
 
 def test_poll_for_token_expired_token(tmp_path):
@@ -254,12 +240,8 @@ def test_poll_for_token_expired_token(tmp_path):
     ):
         with patch("authsome.flows.device_code.time.sleep"):
             with patch("authsome.flows.device_code.time.monotonic", side_effect=[0, 0]):
-                with pytest.raises(
-                    AuthenticationFailedError, match="Device code has expired"
-                ):
-                    flow.authenticate(
-                        provider, crypto, "default", "default", client_id="cid"
-                    )
+                with pytest.raises(AuthenticationFailedError, match="Device code has expired"):
+                    flow.authenticate(provider, crypto, "default", "default", client_id="cid")
 
 
 def test_poll_for_token_unknown_error(tmp_path):
@@ -283,15 +265,11 @@ def test_poll_for_token_unknown_error(tmp_path):
         "error_description": "weird",
     }
 
-    with patch(
-        "authsome.flows.device_code.requests.post", side_effect=[device_resp, token_err]
-    ):
+    with patch("authsome.flows.device_code.requests.post", side_effect=[device_resp, token_err]):
         with patch("authsome.flows.device_code.time.sleep"):
             with patch("authsome.flows.device_code.time.monotonic", side_effect=[0, 0]):
                 with pytest.raises(AuthenticationFailedError, match="weird"):
-                    flow.authenticate(
-                        provider, crypto, "default", "default", client_id="cid"
-                    )
+                    flow.authenticate(provider, crypto, "default", "default", client_id="cid")
 
 
 def test_poll_for_token_success_no_expires_in(tmp_path):

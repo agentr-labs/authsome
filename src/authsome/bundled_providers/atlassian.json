@@ -11,7 +11,12 @@
     "device_authorization_url": null,
     "scopes": [
       "read:jira-work",
-      "read:confluence-content.summary"
+      "write:jira-work",
+      "read:jira-user",
+      "read:confluence-content.all",
+      "read:confluence-space.summary",
+      "write:confluence-content",
+      "offline_access"
     ],
     "pkce": true,
     "supports_device_flow": false,

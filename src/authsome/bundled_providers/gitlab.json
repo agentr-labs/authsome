@@ -12,7 +12,9 @@
     "scopes": [
       "api",
       "read_api",
-      "read_user"
+      "read_user",
+      "read_repository",
+      "write_repository"
     ],
     "pkce": true,
     "supports_device_flow": false,

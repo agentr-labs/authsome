@@ -67,13 +67,17 @@ class TestAuthClientInit:
         assert config_data["spec_version"] == 1
         assert config_data["default_profile"] == "default"
 
-    def test_env_home_override(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_env_home_override(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         custom_home = tmp_path / "custom-authsome"
         monkeypatch.setenv("AUTHSOME_HOME", str(custom_home))
         client = AuthClient()
         assert client.home == custom_home
 
-    def test_explicit_home_overrides_env(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_explicit_home_overrides_env(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         monkeypatch.setenv("AUTHSOME_HOME", "/some/other/path")
         explicit = tmp_path / "explicit"
         client = AuthClient(home=explicit)
@@ -200,7 +204,10 @@ class TestAuthClientLogin:
     """Authentication flow integration tests."""
 
     def test_api_key_login_and_get(self, client: AuthClient) -> None:
-        with patch("authsome.flows.bridge.secure_input_bridge", return_value={"api_key": "sk-test-123"}):
+        with patch(
+            "authsome.flows.bridge.secure_input_bridge",
+            return_value={"api_key": "sk-test-123"},
+        ):
             record = client.login("openai")
 
         assert record.status == ConnectionStatus.CONNECTED
@@ -210,13 +217,19 @@ class TestAuthClientLogin:
         assert conn.status == ConnectionStatus.CONNECTED
 
     def test_login_connection_exists(self, client: AuthClient):
-        with patch("authsome.flows.bridge.secure_input_bridge", return_value={"api_key": "sk-1"}):
+        with patch(
+            "authsome.flows.bridge.secure_input_bridge",
+            return_value={"api_key": "sk-1"},
+        ):
             client.login("openai", "default")
 
         with pytest.raises(AuthsomeError, match="already exists"):
             client.login("openai", "default", force=False)
 
-        with patch("authsome.flows.bridge.secure_input_bridge", return_value={"api_key": "sk-2"}):
+        with patch(
+            "authsome.flows.bridge.secure_input_bridge",
+            return_value={"api_key": "sk-2"},
+        ):
             client.login("openai", "default", force=True)
 
     def test_login_unsupported_flow(self, client: AuthClient):
@@ -235,7 +248,9 @@ class TestAuthClientLogin:
             display_name="Test OAuth",
             auth_type=AuthType.OAUTH2,
             flow=FlowType.PKCE,
-            oauth=OAuthConfig(authorization_url="http://auth", token_url="http://token"),
+            oauth=OAuthConfig(
+                authorization_url="http://auth", token_url="http://token"
+            ),
         )
         client.register_provider(provider)
 
@@ -271,7 +286,9 @@ class TestAuthClientLogin:
             display_name="Test DCR",
             auth_type=AuthType.OAUTH2,
             flow=FlowType.DCR_PKCE,
-            oauth=OAuthConfig(authorization_url="http://auth", token_url="http://token"),
+            oauth=OAuthConfig(
+                authorization_url="http://auth", token_url="http://token"
+            ),
         )
         client.register_provider(provider)
 
@@ -284,7 +301,10 @@ class TestAuthClientLogin:
             auth_type=AuthType.OAUTH2,
             status=ConnectionStatus.CONNECTED,
             access_token=client.crypto.encrypt("access"),
-            metadata={"_dcr_client_id": "cid", "_dcr_client_secret": encrypted_secret.model_dump()},
+            metadata={
+                "_dcr_client_id": "cid",
+                "_dcr_client_secret": encrypted_secret.model_dump(),
+            },
         )
 
         with patch("authsome.client._FLOW_HANDLERS") as handlers:
@@ -304,7 +324,9 @@ class TestAuthClientLogin:
             display_name="Test DCR 2",
             auth_type=AuthType.OAUTH2,
             flow=FlowType.DCR_PKCE,
-            oauth=OAuthConfig(authorization_url="http://auth", token_url="http://token"),
+            oauth=OAuthConfig(
+                authorization_url="http://auth", token_url="http://token"
+            ),
         )
         client.register_provider(provider)
 
@@ -336,7 +358,11 @@ class TestAuthClientLogin:
             display_name="Test OAuth Scopes",
             auth_type=AuthType.OAUTH2,
             flow=FlowType.PKCE,
-            oauth=OAuthConfig(authorization_url="http://auth", token_url="http://token", scopes=["read", "write"]),
+            oauth=OAuthConfig(
+                authorization_url="http://auth",
+                token_url="http://token",
+                scopes=["read", "write"],
+            ),
         )
         client.register_provider(provider)
 
@@ -365,9 +391,11 @@ class TestAuthClientLogin:
                 scopes_field = next(f for f in fields if f.get("name") == "scopes")
                 assert scopes_field["value"] == "read,write"
 
-                creds = client.get_provider_client_credentials("testoauth_scopes", "default")
+                creds = client.get_provider_client_credentials(
+                    "testoauth_scopes", "default"
+                )
                 assert creds.scopes == ["read", "write", "admin"]
-                
+
                 # Check authenticate call
                 mock_handler.authenticate.assert_called_once()
                 call_args = mock_handler.authenticate.call_args[1]
@@ -379,7 +407,11 @@ class TestAuthClientLogin:
             display_name="Test OAuth Scopes Over",
             auth_type=AuthType.OAUTH2,
             flow=FlowType.PKCE,
-            oauth=OAuthConfig(authorization_url="http://auth", token_url="http://token", scopes=["read", "write"]),
+            oauth=OAuthConfig(
+                authorization_url="http://auth",
+                token_url="http://token",
+                scopes=["read", "write"],
+            ),
         )
         client.register_provider(provider)
 
@@ -388,7 +420,7 @@ class TestAuthClientLogin:
                 profile="default",
                 provider="testoauth_scopes_over",
                 client_id="cid",
-                scopes=["read"]
+                scopes=["read"],
             )
         )
 
@@ -408,14 +440,16 @@ class TestAuthClientLogin:
             handlers.get.return_value = lambda: mock_handler
 
             client.login("testoauth_scopes_over", scopes=["custom"])
-            
+
             # Should NOT prompt because scopes are overridden and client_id exists
             mock_handler.authenticate.assert_called_once()
             call_args = mock_handler.authenticate.call_args[1]
             assert call_args["scopes"] == ["custom"]
-            
+
             # Verify persisted scopes were NOT changed
-            creds = client.get_provider_client_credentials("testoauth_scopes_over", "default")
+            creds = client.get_provider_client_credentials(
+                "testoauth_scopes_over", "default"
+            )
             assert creds.scopes == ["read"]
 
 
@@ -423,14 +457,20 @@ class TestAuthClientCredentials:
     """Credential retrieval tests."""
 
     def test_api_key_get_access_token(self, client: AuthClient) -> None:
-        with patch("authsome.flows.bridge.secure_input_bridge", return_value={"api_key": "sk-test-456"}):
+        with patch(
+            "authsome.flows.bridge.secure_input_bridge",
+            return_value={"api_key": "sk-test-456"},
+        ):
             client.login("openai")
 
         token = client.get_access_token("openai")
         assert token == "sk-test-456"
 
     def test_api_key_get_auth_headers(self, client: AuthClient) -> None:
-        with patch("authsome.flows.bridge.secure_input_bridge", return_value={"api_key": "sk-test-789"}):
+        with patch(
+            "authsome.flows.bridge.secure_input_bridge",
+            return_value={"api_key": "sk-test-789"},
+        ):
             client.login("openai")
 
         headers = client.get_auth_headers("openai")
@@ -474,7 +514,9 @@ class TestAuthClientCredentials:
 
         with patch.object(client, "get_provider"):
             with patch.object(client, "get_connection", return_value=mock_record):
-                with pytest.raises(CredentialMissingError, match="Cannot build headers"):
+                with pytest.raises(
+                    CredentialMissingError, match="Cannot build headers"
+                ):
                     client.get_auth_headers("test")
 
     def test_get_auth_headers_api_key_custom(self, client: AuthClient):
@@ -607,14 +649,21 @@ class TestAuthClientTokenRefresh:
         )
 
         mock_token_resp = MagicMock()
-        mock_token_resp.json.return_value = {"access_token": "new_acc", "refresh_token": "new_ref", "expires_in": 3600}
+        mock_token_resp.json.return_value = {
+            "access_token": "new_acc",
+            "refresh_token": "new_ref",
+            "expires_in": 3600,
+        }
 
         with patch("authsome.client.http_client.post", return_value=mock_token_resp):
             assert client.get_access_token("testoauth") == "new_acc"
 
         record.expires_at = now - timedelta(seconds=10)
         client._save_connection(record)
-        with patch("authsome.client.http_client.post", side_effect=requests.RequestException("boom")):
+        with patch(
+            "authsome.client.http_client.post",
+            side_effect=requests.RequestException("boom"),
+        ):
             with pytest.raises(RefreshFailedError):
                 client.get_access_token("testoauth")
 
@@ -669,10 +718,15 @@ class TestAuthClientTokenRefresh:
         client._save_connection(record)
 
         client._save_provider_client_credentials(
-            ProviderClientRecord(profile="default", provider="testoauth", client_id="cid")
+            ProviderClientRecord(
+                profile="default", provider="testoauth", client_id="cid"
+            )
         )
 
-        with patch("authsome.client.http_client.post", side_effect=requests.RequestException("boom")):
+        with patch(
+            "authsome.client.http_client.post",
+            side_effect=requests.RequestException("boom"),
+        ):
             assert client.get_access_token("testoauth") == "valid_acc"
 
     def test_oauth_token_missing_access_token(self, client: AuthClient):
@@ -744,7 +798,11 @@ class TestAuthClientTokenRefresh:
 
     def test_refresh_token_no_oauth_config(self, client: AuthClient):
         provider = ProviderDefinition(
-            name="testoauth", display_name="Test OAuth", auth_type=AuthType.OAUTH2, flow=FlowType.PKCE, oauth=None
+            name="testoauth",
+            display_name="Test OAuth",
+            auth_type=AuthType.OAUTH2,
+            flow=FlowType.PKCE,
+            oauth=None,
         )
         record = ConnectionRecord(
             schema_version=1,
@@ -791,7 +849,11 @@ class TestAuthClientLifecycle:
             display_name="Test OAuth",
             auth_type=AuthType.OAUTH2,
             flow=FlowType.PKCE,
-            oauth=OAuthConfig(authorization_url="http://a", token_url="http://t", revocation_url="http://revoke"),
+            oauth=OAuthConfig(
+                authorization_url="http://a",
+                token_url="http://t",
+                revocation_url="http://revoke",
+            ),
         )
         client.register_provider(provider)
 
@@ -809,14 +871,21 @@ class TestAuthClientLifecycle:
 
         with patch("authsome.client.http_client.post") as mock_post:
             client.logout("testoauth")
-            mock_post.assert_called_once_with("http://revoke", data={"token": "token123"}, timeout=15)
+            mock_post.assert_called_once_with(
+                "http://revoke", data={"token": "token123"}, timeout=15
+            )
 
         client._save_connection(record)
-        with patch("authsome.client.http_client.post", side_effect=requests.RequestException("boom")):
+        with patch(
+            "authsome.client.http_client.post",
+            side_effect=requests.RequestException("boom"),
+        ):
             client.logout("testoauth")
 
     def test_remove_connection(self, client: AuthClient) -> None:
-        with patch("authsome.flows.bridge.secure_input_bridge", return_value={"api_key": "key"}):
+        with patch(
+            "authsome.flows.bridge.secure_input_bridge", return_value={"api_key": "key"}
+        ):
             client.login("openai")
 
         client.remove("openai")
@@ -827,7 +896,9 @@ class TestAuthClientLifecycle:
         client.remove("openai")
 
     def test_revoke_connection(self, client: AuthClient) -> None:
-        with patch("authsome.flows.bridge.secure_input_bridge", return_value={"api_key": "key"}):
+        with patch(
+            "authsome.flows.bridge.secure_input_bridge", return_value={"api_key": "key"}
+        ):
             client.login("openai")
 
         client.revoke("openai")
@@ -843,21 +914,30 @@ class TestAuthClientExport:
     """Export operations tests."""
 
     def test_export_env_format(self, client: AuthClient) -> None:
-        with patch("authsome.flows.bridge.secure_input_bridge", return_value={"api_key": "sk-export"}):
+        with patch(
+            "authsome.flows.bridge.secure_input_bridge",
+            return_value={"api_key": "sk-export"},
+        ):
             client.login("openai")
 
         output = client.export("openai", format=ExportFormat.ENV)
         assert "OPENAI_API_KEY=sk-export" in output
 
     def test_export_shell_format(self, client: AuthClient) -> None:
-        with patch("authsome.flows.bridge.secure_input_bridge", return_value={"api_key": "sk-shell"}):
+        with patch(
+            "authsome.flows.bridge.secure_input_bridge",
+            return_value={"api_key": "sk-shell"},
+        ):
             client.login("openai")
 
         output = client.export("openai", format=ExportFormat.SHELL)
         assert "export OPENAI_API_KEY=sk-shell" in output
 
     def test_export_json_format(self, client: AuthClient) -> None:
-        with patch("authsome.flows.bridge.secure_input_bridge", return_value={"api_key": "sk-json"}):
+        with patch(
+            "authsome.flows.bridge.secure_input_bridge",
+            return_value={"api_key": "sk-json"},
+        ):
             client.login("openai")
 
         output = client.export("openai", format=ExportFormat.JSON)
@@ -896,7 +976,10 @@ class TestAuthClientRun:
     """Run command tests."""
 
     def test_run_command(self, client: AuthClient):
-        with patch("authsome.flows.bridge.secure_input_bridge", return_value={"api_key": "sk-run"}):
+        with patch(
+            "authsome.flows.bridge.secure_input_bridge",
+            return_value={"api_key": "sk-run"},
+        ):
             client.login("openai")
 
         with patch("authsome.client.subprocess.run") as mock_run:
@@ -921,7 +1004,9 @@ class TestAuthClientDoctor:
         assert results["issues"] == []
 
     def test_doctor_issues(self, client: AuthClient, monkeypatch):
-        with patch.object(client.crypto, "encrypt", side_effect=Exception("crypto boom")):
+        with patch.object(
+            client.crypto, "encrypt", side_effect=Exception("crypto boom")
+        ):
             res = client.doctor()
             assert not res["encryption"]
             assert "Encryption: crypto boom" in res["issues"]
@@ -949,7 +1034,9 @@ class TestAuthClientConnections:
         assert connections == []
 
     def test_list_connections_after_login(self, client: AuthClient) -> None:
-        with patch("authsome.flows.bridge.secure_input_bridge", return_value={"api_key": "key"}):
+        with patch(
+            "authsome.flows.bridge.secure_input_bridge", return_value={"api_key": "key"}
+        ):
             client.login("openai")
 
         connections = client.list_connections()

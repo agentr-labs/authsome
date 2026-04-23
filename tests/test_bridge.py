@@ -32,7 +32,9 @@ def test_secure_input_bridge_success():
             assert "Username" in html
 
         # 2. Test POST
-        data = urllib.parse.urlencode({"api_key": "secret123", "username": "testuser"}).encode("utf-8")
+        data = urllib.parse.urlencode(
+            {"api_key": "secret123", "username": "testuser"}
+        ).encode("utf-8")
         req_post = urllib.request.Request(url, data=data, method="POST")
         with urllib.request.urlopen(req_post) as response:
             assert response.status == 200

@@ -85,8 +85,13 @@ def test_profile_not_found_error():
 
 
 def test_connection_not_found_error():
-    err = ConnectionNotFoundError(provider="github", connection="work", profile="default")
-    assert "Connection 'work' not found for provider 'github' in profile 'default'" in str(err)
+    err = ConnectionNotFoundError(
+        provider="github", connection="work", profile="default"
+    )
+    assert (
+        "Connection 'work' not found for provider 'github' in profile 'default'"
+        in str(err)
+    )
 
 
 def test_authentication_failed_error():

@@ -132,7 +132,9 @@ class TestProviderRegistry:
         with pytest.raises(InvalidProviderSchemaError, match="filesystem-safe"):
             registry.register_provider(provider)
 
-    def test_validate_invalid_flow_for_auth_type(self, registry: ProviderRegistry) -> None:
+    def test_validate_invalid_flow_for_auth_type(
+        self, registry: ProviderRegistry
+    ) -> None:
         provider = ProviderDefinition(
             name="badflow",
             display_name="Bad Flow",
@@ -143,7 +145,9 @@ class TestProviderRegistry:
         with pytest.raises(InvalidProviderSchemaError, match="not valid for auth_type"):
             registry.register_provider(provider)
 
-    def test_validate_oauth_requires_oauth_section(self, registry: ProviderRegistry) -> None:
+    def test_validate_oauth_requires_oauth_section(
+        self, registry: ProviderRegistry
+    ) -> None:
         provider = ProviderDefinition(
             name="nooauth",
             display_name="No OAuth",
@@ -154,7 +158,9 @@ class TestProviderRegistry:
         with pytest.raises(InvalidProviderSchemaError, match="requires an 'oauth'"):
             registry.register_provider(provider)
 
-    def test_validate_api_key_requires_api_key_section(self, registry: ProviderRegistry) -> None:
+    def test_validate_api_key_requires_api_key_section(
+        self, registry: ProviderRegistry
+    ) -> None:
         provider = ProviderDefinition(
             name="noapikey",
             display_name="No API Key",
@@ -186,7 +192,9 @@ class TestProviderRegistry:
         loaded = registry.get_provider("goodoauth")
         assert loaded.auth_type == AuthType.OAUTH2
 
-    def test_validate_oauth_missing_optional_url(self, registry: ProviderRegistry) -> None:
+    def test_validate_oauth_missing_optional_url(
+        self, registry: ProviderRegistry
+    ) -> None:
         # Test 197->195 where a URL field is explicitly empty string
         provider = _make_oauth_provider("opturl")
         provider.oauth.token_url = ""  # type: ignore
@@ -212,10 +220,14 @@ class TestProviderRegistry:
         bad_file = registry._providers_dir / "bad.json"
         bad_file.write_text("invalid json")
 
-        with pytest.raises(InvalidProviderSchemaError, match="Failed to parse provider file"):
+        with pytest.raises(
+            InvalidProviderSchemaError, match="Failed to parse provider file"
+        ):
             registry._load_provider_file(bad_file)
 
-    def test_load_local_providers_error_skipping(self, registry: ProviderRegistry) -> None:
+    def test_load_local_providers_error_skipping(
+        self, registry: ProviderRegistry
+    ) -> None:
         # Test 225-229
         registry._providers_dir.mkdir(parents=True, exist_ok=True)
         bad_file = registry._providers_dir / "bad.json"
@@ -224,7 +236,9 @@ class TestProviderRegistry:
         providers = registry._load_local_providers()
         assert "bad" not in providers
 
-    def test_load_bundled_providers_errors(self, registry: ProviderRegistry, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_load_bundled_providers_errors(
+        self, registry: ProviderRegistry, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Test 243-246
         import importlib.resources
 

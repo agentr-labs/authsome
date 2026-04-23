@@ -111,7 +111,9 @@ class KeyringCryptoBackend(CryptoBackend):
             ciphertext = base64.b64decode(field.ciphertext)
             tag = base64.b64decode(field.tag)
         except Exception as exc:
-            raise EncryptionUnavailableError(f"Failed to decode envelope: {exc}") from exc
+            raise EncryptionUnavailableError(
+                f"Failed to decode envelope: {exc}"
+            ) from exc
 
         ct_with_tag = ciphertext + tag
 

@@ -101,7 +101,9 @@ class TestSQLiteStore:
         with pytest.raises(StoreUnavailableError, match="Store connection is closed"):
             store.get("key1")
 
-    def test_lock_acquire_release_errors(self, store: SQLiteStore, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_lock_acquire_release_errors(
+        self, store: SQLiteStore, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Mock fcntl to raise OSError
         import fcntl
 

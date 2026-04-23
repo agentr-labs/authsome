@@ -91,7 +91,9 @@ class DeviceCodeFlow(AuthFlow):
 
         device_code = device_data.get("device_code")
         user_code = device_data.get("user_code")
-        verification_uri = device_data.get("verification_uri") or device_data.get("verification_url")
+        verification_uri = device_data.get("verification_uri") or device_data.get(
+            "verification_url"
+        )
         verification_uri_complete = device_data.get("verification_uri_complete")
         expires_in = int(device_data.get("expires_in", _MAX_POLL_DURATION))
         interval = int(device_data.get("interval", _DEFAULT_POLL_INTERVAL))
@@ -138,7 +140,9 @@ class DeviceCodeFlow(AuthFlow):
             expires_at = now + timedelta(seconds=int(token_expires_in))
 
         encrypted_access = crypto.encrypt(access_token_val)
-        encrypted_refresh = crypto.encrypt(refresh_token_val) if refresh_token_val else None
+        encrypted_refresh = (
+            crypto.encrypt(refresh_token_val) if refresh_token_val else None
+        )
 
         print(f"✓ Successfully authorized with {provider.display_name}!\n")
 
@@ -256,7 +260,9 @@ class DeviceCodeFlow(AuthFlow):
 
             if error == "authorization_pending":
                 # User hasn't authorized yet — keep polling
-                logger.debug("Authorization pending, polling again in %ds...", poll_interval)
+                logger.debug(
+                    "Authorization pending, polling again in %ds...", poll_interval
+                )
                 continue
 
             elif error == "slow_down":

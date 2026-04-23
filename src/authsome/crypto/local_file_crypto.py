@@ -53,7 +53,9 @@ class LocalFileCryptoBackend(CryptoBackend):
                 logger.debug("Master key loaded from local file")
                 return
             except (json.JSONDecodeError, KeyError, ValueError) as exc:
-                raise EncryptionUnavailableError(f"Failed to read local key file {self._key_file}: {exc}") from exc
+                raise EncryptionUnavailableError(
+                    f"Failed to read local key file {self._key_file}: {exc}"
+                ) from exc
 
         # Generate new key
         self._master_key = secrets.token_bytes(_KEY_SIZE_BYTES)
@@ -112,7 +114,9 @@ class LocalFileCryptoBackend(CryptoBackend):
             ciphertext = base64.b64decode(field.ciphertext)
             tag = base64.b64decode(field.tag)
         except Exception as exc:
-            raise EncryptionUnavailableError(f"Failed to decode envelope: {exc}") from exc
+            raise EncryptionUnavailableError(
+                f"Failed to decode envelope: {exc}"
+            ) from exc
 
         ct_with_tag = ciphertext + tag
 

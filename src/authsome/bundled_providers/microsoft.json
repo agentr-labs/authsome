@@ -26,5 +26,6 @@
       "access_token": "MICROSOFT_ACCESS_TOKEN",
       "refresh_token": "MICROSOFT_REFRESH_TOKEN"
     }
-  }
+  },
+  "host_url": "graph.microsoft.com"
 }

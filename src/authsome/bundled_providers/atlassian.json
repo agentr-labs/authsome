@@ -25,5 +25,6 @@
       "access_token": "ATLASSIAN_ACCESS_TOKEN",
       "refresh_token": "ATLASSIAN_REFRESH_TOKEN"
     }
-  }
+  },
+  "host_url": "api.atlassian.com"
 }

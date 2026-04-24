@@ -61,7 +61,7 @@ authsome login github
 Then agents get valid credentials on demand:
 
 ```bash
-authsome get github --field access_token
+authsome get github --field access_token --show-secret
 # → ghu_...
 
 authsome export github --format shell
@@ -98,7 +98,7 @@ Authsome gives agents one command for a valid token, without scattering long-liv
 pip install authsome
 authsome init
 authsome login github                  # opens browser, completes PKCE flow
-authsome login github --flow device    # headless: Device Code, works over SSH and CI
+authsome login github --flow device_code  # headless: Device Code, works over SSH and CI
 authsome login openai                  # secure API key entry via browser bridge
 authsome list                          # all connections + token status
 ```

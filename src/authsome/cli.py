@@ -48,7 +48,12 @@ pass_ctx = click.make_pass_decorator(ContextObj)
 def common_options(f):
     """Decorator to add common global options to both group and subcommands."""
 
-    @click.option("--json", "json_output", is_flag=True, help="Output in machine-readable JSON format.")
+    @click.option(
+        "--json",
+        "json_output",
+        is_flag=True,
+        help="Output in machine-readable JSON format.",
+    )
     @click.option("--quiet", is_flag=True, help="Suppress non-essential output.")
     @click.option("--no-color", is_flag=True, help="Disable ANSI colors.")
     @functools.wraps(f)
@@ -214,7 +219,11 @@ def list_cmd(ctx_obj: ContextObj) -> None:
 @click.option("--connection", default="default", help="Connection name.")
 @click.option("--flow", help="Authentication flow override.")
 @click.option("--scopes", help="Comma-separated scopes to request.")
-@click.option("--force", is_flag=True, help="Overwrite an existing connection if it already exists.")
+@click.option(
+    "--force",
+    is_flag=True,
+    help="Overwrite an existing connection if it already exists.",
+)
 @common_options
 @pass_ctx
 @handle_errors
@@ -232,7 +241,10 @@ def login(
     scope_list = [s.strip() for s in scopes.split(",")] if scopes else None
 
     if force and not ctx_obj.quiet:
-        ctx_obj.echo("Warning: Forcing login will overwrite any existing connection.", color="yellow")
+        ctx_obj.echo(
+            "Warning: Forcing login will overwrite any existing connection.",
+            color="yellow",
+        )
 
     if not ctx_obj.json_output:
         ctx_obj.echo(f"Starting login for {provider}...", color="cyan")
@@ -315,7 +327,13 @@ def remove(ctx_obj: ContextObj, provider: str) -> None:
 @common_options
 @pass_ctx
 @handle_errors
-def get(ctx_obj: ContextObj, provider: str, connection: str, field: str | None, show_secret: bool) -> None:
+def get(
+    ctx_obj: ContextObj,
+    provider: str,
+    connection: str,
+    field: str | None,
+    show_secret: bool,
+) -> None:
     """Return provider connection metadata by default."""
     client = ctx_obj.initialize_client()
     record = client.get_connection(provider, connection)
@@ -324,11 +342,21 @@ def get(ctx_obj: ContextObj, provider: str, connection: str, field: str | None, 
 
     # Redact secrets unless requested
     if not show_secret:
-        for secret_field in ["access_token", "refresh_token", "api_key", "client_secret"]:
+        for secret_field in [
+            "access_token",
+            "refresh_token",
+            "api_key",
+            "client_secret",
+        ]:
             if data.get(secret_field):
                 data[secret_field] = "***REDACTED***"
     else:
-        for secret_field in ["access_token", "refresh_token", "api_key", "client_secret"]:
+        for secret_field in [
+            "access_token",
+            "refresh_token",
+            "api_key",
+            "client_secret",
+        ]:
             val = getattr(record, secret_field, None)
             if val:
                 data[secret_field] = client.crypto.decrypt(val)
@@ -371,7 +399,12 @@ def inspect(ctx_obj: ContextObj, provider: str) -> None:
 @cli.command()
 @click.argument("provider")
 @click.option("--connection", default="default", help="Connection name.")
-@click.option("--format", "export_format", type=click.Choice(["env", "shell", "json"]), default="env")
+@click.option(
+    "--format",
+    "export_format",
+    type=click.Choice(["env", "shell", "json"]),
+    default="env",
+)
 @common_options
 @pass_ctx
 @handle_errors
@@ -447,7 +480,7 @@ def whoami(ctx_obj: ContextObj) -> None:
     client = ctx_obj.initialize_client()
     data = {
         "home_directory": str(client.home),
-        "encryption_mode": client.config.encryption.mode if client.config.encryption else "local_key",
+        "encryption_mode": (client.config.encryption.mode if client.config.encryption else "local_key"),
     }
 
     if ctx_obj.json_output:

@@ -379,7 +379,7 @@ class AuthClient:
                 missing_fields.append(
                     {
                         "name": "scopes",
-                        "label": f"Scopes (comma-separated) [default: {default_scopes}]",
+                        "label": "Scopes (comma-separated)",
                         "type": "text",
                         "value": default_scopes,
                         "required": False,

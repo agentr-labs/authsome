@@ -69,6 +69,10 @@ authsome export github --format shell
 
 authsome run --provider github --provider openai -- python my_agent.py
 # runs the script with GITHUB_TOKEN and OPENAI_API_KEY injected
+
+authsome proxy run -- python my_agent.py
+# runs behind a local proxy that injects auth headers at request time
+# without exposing secrets in the child process environment
 ```
 
 Credentials are stored locally, encrypted at rest, and refreshed before expiry. No server. No account. No cloud.

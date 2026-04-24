@@ -59,8 +59,7 @@ authsome list
 | `pkce` | `PkceFlow` | Spins up an HTTP server on port **7999** for the OAuth callback |
 | `device_code` | `DeviceCodeFlow` | Polls token endpoint; no browser needed |
 | `dcr_pkce` | `DcrPkceFlow` | Dynamic Client Registration then PKCE |
-| `api_key_prompt` | `ApiKeyPromptFlow` | Interactive `getpass` |
-| `api_key_env` | `ApiKeyEnvFlow` | Reads from environment variable |
+| `api_key` | `ApiKeyFlow` | Prompts via secure browser bridge |
 
 **Provider Registry (`src/authsome/providers/registry.py`)** resolves providers in this order: local `~/.authsome/providers/<name>.json` overrides bundled JSON in `src/authsome/bundled_providers/`. Bundled providers (GitHub, Google, Okta, Linear, OpenAI) are loaded via `importlib.resources`.
 
@@ -80,4 +79,4 @@ profile:<profile>:<provider>:state
 
 `ClientConfig` supports `env:VAR_NAME` syntax so client credentials can come from environment variables without hardcoding them in the provider JSON.
 
-**CLI (`src/authsome/cli.py`)** is Click-based. All commands support `--json` for machine-readable output and `--profile` to override the active profile.
+**CLI (`src/authsome/cli.py`)** is Click-based. All commands support `--json` for machine-readable output.

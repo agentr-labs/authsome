@@ -1,6 +1,6 @@
 # CLI Reference
 
-All commands support `--json` for machine-readable output and `--profile` to switch between credential sets (personal, work, agent, etc.).
+All commands support `--json` for machine-readable output.
 
 ---
 
@@ -29,7 +29,6 @@ All commands support `--json` for machine-readable output and `--profile` to swi
 | Flag | Description |
 |------|-------------|
 | `--json` | Machine-readable JSON output. |
-| `--profile <name>` | Switch between credential sets (personal, work, agent). |
 | `--quiet` | Suppress non-essential output. |
 | `--no-color` | Disable ANSI colors. |
 

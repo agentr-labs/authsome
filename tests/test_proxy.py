@@ -177,6 +177,7 @@ class TestProxyRunner:
         assert "localhost" in env["NO_PROXY"]
         assert "127.0.0.1" in env["NO_PROXY"]
         assert env["AUTHSOME_PROXY_MODE"] == "true"
+
         # No provider is logged in, so no dummy vars should be set
         assert env.get("OPENAI_API_KEY") != "authsome-proxy-managed"
 

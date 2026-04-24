@@ -24,5 +24,6 @@
       "access_token": "DISCORD_ACCESS_TOKEN",
       "refresh_token": "DISCORD_REFRESH_TOKEN"
     }
-  }
+  },
+  "host_url": "discord.com"
 }

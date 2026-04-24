@@ -26,5 +26,6 @@
       "access_token": "GITLAB_ACCESS_TOKEN",
       "refresh_token": "GITLAB_REFRESH_TOKEN"
     }
-  }
+  },
+  "host_url": "gitlab.com"
 }

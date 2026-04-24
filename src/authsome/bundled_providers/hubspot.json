@@ -27,5 +27,6 @@
       "access_token": "HUBSPOT_ACCESS_TOKEN",
       "refresh_token": "HUBSPOT_REFRESH_TOKEN"
     }
-  }
+  },
+  "host_url": "api.hubapi.com"
 }

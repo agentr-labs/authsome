@@ -19,5 +19,6 @@
       "access_token": "NOTION_ACCESS_TOKEN",
       "refresh_token": "NOTION_REFRESH_TOKEN"
     }
-  }
+  },
+  "host_url": "api.notion.com"
 }

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from datetime import UTC, datetime
+from typing import Any
 
 
 def utc_now() -> datetime:
@@ -75,3 +76,29 @@ def build_store_key(
         f"Cannot build store key with profile={profile}, provider={provider}, "
         f"record_type={record_type}, connection={connection}"
     )
+
+
+def redact(record: Any, redacted_value: str = "***REDACTED***") -> dict[str, Any]:
+    """
+    Return a dict of a Pydantic model with Sensitive-annotated fields replaced.
+
+    Uses get_type_hints(include_extras=True) to detect Annotated[..., Sensitive()]
+    fields and replaces their values with redacted_value before display.
+    """
+    import typing
+
+    from authsome.auth.models.connection import Sensitive
+
+    data = record.model_dump(mode="json")
+    try:
+        hints = typing.get_type_hints(type(record), include_extras=True)
+    except Exception:
+        return data
+
+    for field_name, hint in hints.items():
+        if typing.get_origin(hint) is typing.Annotated:
+            metadata = typing.get_args(hint)[1:]
+            if any(isinstance(m, Sensitive) for m in metadata):
+                if data.get(field_name) is not None:
+                    data[field_name] = redacted_value
+    return data

@@ -1,7 +1,4 @@
-"""Command-line interface for authsome.
-
-Implements all commands defined in spec §18 using Click.
-"""
+"""Command-line interface for authsome."""
 
 import functools
 import json as json_lib
@@ -12,9 +9,10 @@ from typing import Any
 import click
 
 from authsome import __version__
-from authsome.client import AuthClient
+from authsome.auth.models.enums import ExportFormat, FlowType
+from authsome.context import AuthsomeContext
 from authsome.errors import AuthsomeError
-from authsome.models.enums import ExportFormat, FlowType
+from authsome.utils import redact
 
 
 class ContextObj:
@@ -24,12 +22,12 @@ class ContextObj:
         self.json_output = json_output
         self.quiet = quiet
         self.no_color = no_color
-        self.client: AuthClient | None = None
+        self._ctx: AuthsomeContext | None = None
 
-    def initialize_client(self) -> AuthClient:
-        if self.client is None:
-            self.client = AuthClient()
-        return self.client
+    def initialize(self) -> AuthsomeContext:
+        if self._ctx is None:
+            self._ctx = AuthsomeContext.create()
+        return self._ctx
 
     def print_json(self, data: Any) -> None:
         click.echo(json_lib.dumps(data, indent=2))
@@ -46,14 +44,7 @@ pass_ctx = click.make_pass_decorator(ContextObj)
 
 
 def common_options(f):
-    """Decorator to add common global options to both group and subcommands."""
-
-    @click.option(
-        "--json",
-        "json_output",
-        is_flag=True,
-        help="Output in machine-readable JSON format.",
-    )
+    @click.option("--json", "json_output", is_flag=True, help="Output in machine-readable JSON format.")
     @click.option("--quiet", is_flag=True, help="Suppress non-essential output.")
     @click.option("--no-color", is_flag=True, help="Disable ANSI colors.")
     @functools.wraps(f)
@@ -61,7 +52,6 @@ def common_options(f):
         json_output = kwargs.pop("json_output", False)
         quiet = kwargs.pop("quiet", False)
         no_color = kwargs.pop("no_color", False)
-
         ctx = click.get_current_context()
         if getattr(ctx, "obj", None) is None:
             ctx.obj = ContextObj(json_output, quiet, no_color)
@@ -72,17 +62,14 @@ def common_options(f):
                 ctx.obj.quiet = True
             if no_color:
                 ctx.obj.no_color = True
-
         return f(*args, **kwargs)
 
     return wrapper
 
 
 def format_error_code(exc: Exception) -> int:
-    """Map exceptions to standard exit codes per spec §18.3."""
     if not isinstance(exc, AuthsomeError):
         return 1
-
     exc_name = exc.__class__.__name__
     if exc_name == "ProviderNotFoundError":
         return 3
@@ -98,20 +85,13 @@ def format_error_code(exc: Exception) -> int:
 
 
 def handle_errors(func):
-    """Decorator to catch exceptions and exit with proper codes."""
-
     @functools.wraps(func)
     def wrapper(ctx_obj: ContextObj, *args, **kwargs):
         try:
             return func(ctx_obj, *args, **kwargs)
         except Exception as exc:
             if ctx_obj.json_output:
-                ctx_obj.print_json(
-                    {
-                        "error": exc.__class__.__name__,
-                        "message": str(exc),
-                    }
-                )
+                ctx_obj.print_json({"error": exc.__class__.__name__, "message": str(exc)})
             else:
                 ctx_obj.echo(f"Error: {exc}", err=True, color="red")
             sys.exit(format_error_code(exc))
@@ -134,13 +114,26 @@ def cli(ctx: click.Context) -> None:
 @handle_errors
 def init(ctx_obj: ContextObj) -> None:
     """Initialize the authsome root directory and default profile."""
-    client = ctx_obj.initialize_client()
-    client.init()
+    actx = ctx_obj.initialize()
+    actx.vault.init()
+    actx.auth.create_profile("default", description="Default local profile")
+
+    home = actx.vault._home
+    version_file = home / "version"
+    if not version_file.exists():
+        version_file.write_text("2\n", encoding="utf-8")
+
+    from authsome.auth.models.config import GlobalConfig
+
+    config_file = home / "config.json"
+    if not config_file.exists():
+        config = GlobalConfig()
+        config_file.write_text(config.model_dump_json(indent=2), encoding="utf-8")
 
     if ctx_obj.json_output:
-        ctx_obj.print_json({"status": "initialized", "home": str(client.home)})
+        ctx_obj.print_json({"status": "initialized", "home": str(home)})
     else:
-        ctx_obj.echo(f"Initialized authsome at {client.home}", color="green")
+        ctx_obj.echo(f"Initialized authsome at {home}", color="green")
 
 
 @cli.command(name="list")
@@ -149,11 +142,10 @@ def init(ctx_obj: ContextObj) -> None:
 @handle_errors
 def list_cmd(ctx_obj: ContextObj) -> None:
     """List providers and connection states."""
-    client = ctx_obj.initialize_client()
-    raw_list = client.list_connections()
-    by_source = client.list_providers_by_source()
+    actx = ctx_obj.initialize()
+    raw_list = actx.auth.list_connections()
+    by_source = actx.auth.list_providers_by_source()
 
-    # Index connections by provider name
     connected: dict[str, list[dict]] = {}
     for provider_group in raw_list:
         connected[provider_group["name"]] = provider_group["connections"]
@@ -161,18 +153,17 @@ def list_cmd(ctx_obj: ContextObj) -> None:
     def build_provider_entry(provider, source: str) -> dict:
         conns = connected.get(provider.name, [])
         connections_out = []
-        if conns:
-            for conn in conns:
-                c: dict = {
-                    "connection_name": conn["connection_name"],
-                    "auth_type": conn.get("auth_type"),
-                    "status": conn.get("status"),
-                }
-                if conn.get("scopes"):
-                    c["scopes"] = conn["scopes"]
-                if conn.get("expires_at"):
-                    c["expires_at"] = conn["expires_at"]
-                connections_out.append(c)
+        for conn in conns:
+            c: dict = {
+                "connection_name": conn["connection_name"],
+                "auth_type": conn.get("auth_type"),
+                "status": conn.get("status"),
+            }
+            if conn.get("scopes"):
+                c["scopes"] = conn["scopes"]
+            if conn.get("expires_at"):
+                c["expires_at"] = conn["expires_at"]
+            connections_out.append(c)
         return {
             "name": provider.name,
             "display_name": provider.display_name,
@@ -185,12 +176,7 @@ def list_cmd(ctx_obj: ContextObj) -> None:
     custom_out = [build_provider_entry(p, "custom") for p in by_source["custom"]]
 
     if ctx_obj.json_output:
-        ctx_obj.print_json(
-            {
-                "bundled": bundled_out,
-                "custom": custom_out,
-            }
-        )
+        ctx_obj.print_json({"bundled": bundled_out, "custom": custom_out})
         return
 
     def print_provider_section(label: str, providers: list[dict]) -> None:
@@ -219,52 +205,30 @@ def list_cmd(ctx_obj: ContextObj) -> None:
 @click.option("--connection", default="default", help="Connection name.")
 @click.option("--flow", help="Authentication flow override.")
 @click.option("--scopes", help="Comma-separated scopes to request.")
-@click.option(
-    "--force",
-    is_flag=True,
-    help="Overwrite an existing connection if it already exists.",
-)
+@click.option("--force", is_flag=True, help="Overwrite an existing connection if it already exists.")
 @common_options
 @pass_ctx
 @handle_errors
 def login(
-    ctx_obj: ContextObj,
-    provider: str,
-    connection: str,
-    flow: str | None,
-    scopes: str | None,
-    force: bool,
+    ctx_obj: ContextObj, provider: str, connection: str, flow: str | None, scopes: str | None, force: bool
 ) -> None:
     """Authenticate with a provider using its configured flow."""
-    client = ctx_obj.initialize_client()
+    actx = ctx_obj.initialize()
     flow_enum = FlowType(flow) if flow else None
     scope_list = [s.strip() for s in scopes.split(",")] if scopes else None
 
     if force and not ctx_obj.quiet:
-        ctx_obj.echo(
-            "Warning: Forcing login will overwrite any existing connection.",
-            color="yellow",
-        )
-
+        ctx_obj.echo("Warning: Forcing login will overwrite any existing connection.", color="yellow")
     if not ctx_obj.json_output:
         ctx_obj.echo(f"Starting login for {provider}...", color="cyan")
 
-    record = client.login(
-        provider=provider,
-        connection_name=connection,
-        scopes=scope_list,
-        flow_override=flow_enum,
-        force=force,
+    record = actx.auth.login(
+        provider=provider, connection_name=connection, scopes=scope_list, flow_override=flow_enum, force=force
     )
 
     if ctx_obj.json_output:
         ctx_obj.print_json(
-            {
-                "status": "success",
-                "provider": provider,
-                "connection": connection,
-                "record_status": record.status.value,
-            }
+            {"status": "success", "provider": provider, "connection": connection, "record_status": record.status.value}
         )
     else:
         ctx_obj.echo(f"Successfully logged in to {provider} ({connection}).", color="green")
@@ -278,8 +242,8 @@ def login(
 @handle_errors
 def logout(ctx_obj: ContextObj, provider: str, connection: str) -> None:
     """Log out of a connection and remove local state."""
-    client = ctx_obj.initialize_client()
-    client.logout(provider, connection)
+    actx = ctx_obj.initialize()
+    actx.auth.logout(provider, connection)
 
     if ctx_obj.json_output:
         ctx_obj.print_json({"status": "logged_out", "provider": provider, "connection": connection})
@@ -294,8 +258,8 @@ def logout(ctx_obj: ContextObj, provider: str, connection: str) -> None:
 @handle_errors
 def revoke(ctx_obj: ContextObj, provider: str) -> None:
     """Complete reset of the provider, removing all connections and client secrets."""
-    client = ctx_obj.initialize_client()
-    client.revoke(provider)
+    actx = ctx_obj.initialize()
+    actx.auth.revoke(provider)
 
     if ctx_obj.json_output:
         ctx_obj.print_json({"status": "revoked", "provider": provider})
@@ -310,8 +274,8 @@ def revoke(ctx_obj: ContextObj, provider: str) -> None:
 @handle_errors
 def remove(ctx_obj: ContextObj, provider: str) -> None:
     """Uninstall a local provider or reset a bundled one."""
-    client = ctx_obj.initialize_client()
-    client.remove(provider)
+    actx = ctx_obj.initialize()
+    actx.auth.remove(provider)
 
     if ctx_obj.json_output:
         ctx_obj.print_json({"status": "removed", "provider": provider})
@@ -327,39 +291,12 @@ def remove(ctx_obj: ContextObj, provider: str) -> None:
 @common_options
 @pass_ctx
 @handle_errors
-def get(
-    ctx_obj: ContextObj,
-    provider: str,
-    connection: str,
-    field: str | None,
-    show_secret: bool,
-) -> None:
+def get(ctx_obj: ContextObj, provider: str, connection: str, field: str | None, show_secret: bool) -> None:
     """Return provider connection metadata by default."""
-    client = ctx_obj.initialize_client()
-    record = client.get_connection(provider, connection)
+    actx = ctx_obj.initialize()
+    record = actx.auth.get_connection(provider, connection)
 
-    data = record.model_dump(mode="json")
-
-    # Redact secrets unless requested
-    if not show_secret:
-        for secret_field in [
-            "access_token",
-            "refresh_token",
-            "api_key",
-            "client_secret",
-        ]:
-            if data.get(secret_field):
-                data[secret_field] = "***REDACTED***"
-    else:
-        for secret_field in [
-            "access_token",
-            "refresh_token",
-            "api_key",
-            "client_secret",
-        ]:
-            val = getattr(record, secret_field, None)
-            if val:
-                data[secret_field] = client.crypto.decrypt(val)
+    data = redact(record) if not show_secret else record.model_dump(mode="json")
 
     if field:
         if field in data:
@@ -386,9 +323,8 @@ def get(
 @handle_errors
 def inspect(ctx_obj: ContextObj, provider: str) -> None:
     """Return provider definition and local connection summary."""
-    client = ctx_obj.initialize_client()
-    definition = client.get_provider(provider)
-
+    actx = ctx_obj.initialize()
+    definition = actx.auth.get_provider(provider)
     data = definition.model_dump(mode="json")
     if ctx_obj.json_output:
         ctx_obj.print_json(data)
@@ -399,22 +335,15 @@ def inspect(ctx_obj: ContextObj, provider: str) -> None:
 @cli.command()
 @click.argument("provider")
 @click.option("--connection", default="default", help="Connection name.")
-@click.option(
-    "--format",
-    "export_format",
-    type=click.Choice(["env", "shell", "json"]),
-    default="env",
-)
+@click.option("--format", "export_format", type=click.Choice(["env", "shell", "json"]), default="env")
 @common_options
 @pass_ctx
 @handle_errors
 def export(ctx_obj: ContextObj, provider: str, connection: str, export_format: str) -> None:
     """Export credential material in selected format."""
-    client = ctx_obj.initialize_client()
+    actx = ctx_obj.initialize()
     fmt = ExportFormat(export_format)
-    output = client.export(provider, connection, format=fmt)
-
-    # Do not apply color or structured wrapping here, just output exactly what is requested
+    output = actx.auth.export(provider, connection, format=fmt)
     if output:
         click.echo(output)
 
@@ -425,16 +354,9 @@ def export(ctx_obj: ContextObj, provider: str, connection: str, export_format: s
 @pass_ctx
 @handle_errors
 def run(ctx_obj: ContextObj, command: tuple[str]) -> None:
-    """Run a subprocess behind the local auth proxy.
-
-    The proxy injects provider auth headers into matched HTTP(S)
-    requests without exporting secrets into the child environment.
-    """
-    from authsome.proxy.runner import ProxyRunner
-
-    client = ctx_obj.initialize_client()
-    runner = ProxyRunner(client)
-    result = runner.run(list(command))
+    """Run a subprocess behind the local auth proxy."""
+    actx = ctx_obj.initialize()
+    result = actx.proxy.run(list(command))
     sys.exit(result.returncode)
 
 
@@ -448,8 +370,7 @@ def register(ctx_obj: ContextObj, path: str, force: bool) -> None:
     """Register a provider definition from a local JSON file path."""
     import pathlib
 
-    client = ctx_obj.initialize_client()
-
+    actx = ctx_obj.initialize()
     filepath = pathlib.Path(path)
     if not filepath.exists():
         ctx_obj.echo(f"File not found: {path}", err=True, color="red")
@@ -457,10 +378,10 @@ def register(ctx_obj: ContextObj, path: str, force: bool) -> None:
 
     try:
         data = json_lib.loads(filepath.read_text(encoding="utf-8"))
-        from authsome.models.provider import ProviderDefinition
+        from authsome.auth.models.provider import ProviderDefinition
 
         definition = ProviderDefinition.model_validate(data)
-        client.register_provider(definition, force=force)
+        actx.auth.register_provider(definition, force=force)
 
         if ctx_obj.json_output:
             ctx_obj.print_json({"status": "registered", "provider": definition.name})
@@ -477,12 +398,22 @@ def register(ctx_obj: ContextObj, path: str, force: bool) -> None:
 @handle_errors
 def whoami(ctx_obj: ContextObj) -> None:
     """Show basic local context."""
-    client = ctx_obj.initialize_client()
-    data = {
-        "home_directory": str(client.home),
-        "encryption_mode": (client.config.encryption.mode if client.config.encryption else "local_key"),
-    }
+    actx = ctx_obj.initialize()
+    from authsome.auth.models.config import GlobalConfig
 
+    home = actx.vault._home
+    config_path = home / "config.json"
+    config = GlobalConfig()
+    if config_path.exists():
+        try:
+            config = GlobalConfig.model_validate_json(config_path.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+
+    data = {
+        "home_directory": str(home),
+        "encryption_mode": config.encryption.mode if config.encryption else "local_key",
+    }
     if ctx_obj.json_output:
         ctx_obj.print_json(data)
     else:
@@ -496,8 +427,8 @@ def whoami(ctx_obj: ContextObj) -> None:
 @handle_errors
 def doctor(ctx_obj: ContextObj) -> None:
     """Run health checks on directory layout and encryption."""
-    client = ctx_obj.initialize_client()
-    results = client.doctor()
+    actx = ctx_obj.initialize()
+    results = actx.auth.doctor(actx.vault._home)
 
     if ctx_obj.json_output:
         ctx_obj.print_json(results)
@@ -514,7 +445,6 @@ def doctor(ctx_obj: ContextObj) -> None:
             ctx_obj.echo(status, color=color)
 
         ctx_obj.echo(f"Providers Configured: {results.get('providers_count', 0)}")
-
         issues = results.get("issues", [])
         if issues:
             ctx_obj.echo("\nIssues found:", color="red")

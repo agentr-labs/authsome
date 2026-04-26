@@ -3,7 +3,7 @@
 Re-exports core types used by CLI and tests.
 """
 
-from authsome.proxy.router import RequestRouter, RouteMatch
+from authsome.proxy.router import RouteMatch
 from authsome.proxy.runner import ProxyRunner
 
-__all__ = ["ProxyRunner", "RequestRouter", "RouteMatch"]
+__all__ = ["ProxyRunner", "RouteMatch"]

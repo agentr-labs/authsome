@@ -8,7 +8,7 @@ from unittest.mock import Mock, patch
 import pytest
 
 from authsome.auth import AuthLayer
-from authsome.auth.flows.input_provider import MockInputProvider
+from authsome.auth.input_provider import MockInputProvider
 from authsome.auth.providers.registry import ProviderRegistry
 from authsome.proxy.router import RouteMatch
 from authsome.proxy.server import AuthProxyAddon, _route

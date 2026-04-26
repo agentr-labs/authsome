@@ -119,7 +119,7 @@ class ProviderRegistry:
     def _load_bundled_providers(self) -> dict[str, ProviderDefinition]:
         providers: dict[str, ProviderDefinition] = {}
         try:
-            bundled_pkg = importlib.resources.files("authsome.bundled_providers")
+            bundled_pkg = importlib.resources.files("authsome.auth.bundled_providers")
             for resource in bundled_pkg.iterdir():
                 if resource.name.endswith(".json"):
                     try:

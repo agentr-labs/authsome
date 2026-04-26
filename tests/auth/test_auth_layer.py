@@ -9,7 +9,7 @@ import pytest
 import requests
 
 from authsome.auth import AuthLayer
-from authsome.auth.flows.input_provider import MockInputProvider
+from authsome.auth.input_provider import MockInputProvider
 from authsome.auth.models.connection import ConnectionRecord, ProviderClientRecord
 from authsome.auth.models.enums import AuthType, ConnectionStatus, ExportFormat, FlowType
 from authsome.auth.models.provider import ApiKeyConfig, OAuthConfig, ProviderDefinition

@@ -18,8 +18,8 @@ from authsome.auth.flows.api_key import ApiKeyFlow
 from authsome.auth.flows.base import AuthFlow
 from authsome.auth.flows.dcr_pkce import DcrPkceFlow
 from authsome.auth.flows.device_code import DeviceCodeFlow
-from authsome.auth.flows.input_provider import BridgeInputProvider, InputField, InputProvider
 from authsome.auth.flows.pkce import PkceFlow
+from authsome.auth.input_provider import BridgeInputProvider, InputField, InputProvider
 from authsome.auth.models.connection import (
     ConnectionRecord,
     ProviderClientRecord,

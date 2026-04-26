@@ -34,7 +34,7 @@ class ApiKeyFlow(AuthFlow):
 
         return FlowResult(
             connection=ConnectionRecord(
-                schema_version=2,
+                schema_version=2,  # TODO: Version should be somewhere else, like a global var
                 provider=provider.name,
                 profile=profile,
                 connection_name=connection_name,

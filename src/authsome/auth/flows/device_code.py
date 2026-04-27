@@ -97,7 +97,9 @@ class DeviceCodeFlow(AuthFlow):
             )
         )
 
-    def _request_device_code(self, provider: ProviderDefinition, client_id: str | None, scopes: list[str]) -> dict[str, Any]:
+    def _request_device_code(
+        self, provider: ProviderDefinition, client_id: str | None, scopes: list[str]
+    ) -> dict[str, Any]:
         assert provider.oauth is not None
         assert provider.oauth.device_authorization_url is not None
         payload: dict[str, str] = {}

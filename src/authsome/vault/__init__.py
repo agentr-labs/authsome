@@ -12,12 +12,16 @@ All key schema decisions belong to the caller (AuthLayer).
 from __future__ import annotations
 
 import builtins
+from collections.abc import Callable
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from loguru import logger
 
-from authsome.vault.crypto import VaultCrypto, create_crypto
 from authsome.vault.storage import SQLiteStorage
+
+if TYPE_CHECKING:
+    from authsome.vault.crypto import VaultCrypto
 
 _DEFAULT_PROFILE = "default"
 
@@ -34,21 +38,25 @@ class Vault:
 
     def __init__(
         self,
-        home: Path,
+        storage_resolver: Callable[[str], SQLiteStorage],
+        crypto: VaultCrypto | None = None,
         crypto_mode: str = "local_key",
-        _crypto: VaultCrypto | None = None,
+        master_key_path: Path | None = None,
     ) -> None:
-        self._home = home
+        self._storage_resolver = storage_resolver
+        self._crypto = crypto
         self._crypto_mode = crypto_mode
-        self._crypto: VaultCrypto | None = _crypto
+        self._master_key_path = master_key_path
         self._stores: dict[str, SQLiteStorage] = {}
 
-    # ── Lazy crypto init ──────────────────────────────────────────────────
+    # ── Core KV interface ─────────────────────────────────────────────────
 
     @property
     def crypto(self) -> VaultCrypto:
         if self._crypto is None:
-            self._crypto = create_crypto(self._home, self._crypto_mode)
+            from authsome.vault.crypto import create_crypto
+
+            self._crypto = create_crypto(self._master_key_path, self._crypto_mode)
         return self._crypto
 
     # ── Core KV interface ─────────────────────────────────────────────────
@@ -119,10 +127,5 @@ class Vault:
 
     def _storage(self, profile: str) -> SQLiteStorage:
         if profile not in self._stores:
-            profile_dir = self._home / "profiles" / profile
-            if not profile_dir.exists():
-                from authsome.errors import ProfileNotFoundError
-
-                raise ProfileNotFoundError(profile)
-            self._stores[profile] = SQLiteStorage(profile_dir)
+            self._stores[profile] = self._storage_resolver(profile)
         return self._stores[profile]

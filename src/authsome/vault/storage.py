@@ -42,6 +42,7 @@ class SQLiteStorage:
                 str(self._db_path),
                 timeout=10.0,
                 isolation_level="DEFERRED",
+                check_same_thread=False,
             )
             self._conn.execute("PRAGMA journal_mode=WAL")
             self._conn.execute(_SCHEMA_SQL)

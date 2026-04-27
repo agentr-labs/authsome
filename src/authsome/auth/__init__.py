@@ -227,6 +227,8 @@ class AuthLayer:
         if flow_type == FlowType.API_KEY:
             fields_to_collect.append(InputField(name="api_key", label="API Key", secret=True))
 
+        static_hints.extend(self._build_docs_hints(definition, flow_type))
+
         if fields_to_collect:
             ip: InputProvider = input_provider or BridgeInputProvider(
                 title=f"{definition.display_name} Credentials",
@@ -288,6 +290,23 @@ class AuthLayer:
 
         logger.info("Login successful: provider={} connection={} profile={}", provider, connection_name, self._identity)
         return result.connection
+
+    @staticmethod
+    def _build_docs_hints(definition: ProviderDefinition, flow_type: FlowType) -> list[dict[str, Any]]:
+        """Convert provider docs URL into a bridge instruction block."""
+        if not definition.docs:
+            return []
+
+        if flow_type not in (FlowType.PKCE, FlowType.DEVICE_CODE, FlowType.DCR_PKCE, FlowType.API_KEY):
+            return []
+
+        return [
+            {
+                "type": "instructions",
+                "label": "Instructions",
+                "url": definition.docs,
+            }
+        ]
 
     # ── Token operations ──────────────────────────────────────────────────
 

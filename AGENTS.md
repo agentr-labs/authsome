@@ -4,40 +4,42 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
+Always use `uv run` to execute commands — do not use `python`, `python3`, `pip`, or bare tool names directly.
+
 ```bash
 # Install in editable mode (required before running anything)
-pip install -e ".[dev]"
+uv pip install -e ".[dev]"
 
 # Run all tests
-pytest
+uv run pytest
 
 # Run a single test file
-pytest tests/test_client.py
+uv run pytest tests/test_client.py
 
 # Run a single test by name
-pytest tests/test_client.py::test_login_pkce -v
+uv run pytest tests/test_client.py::test_login_pkce -v
 
 # Run tests with coverage
-pytest --cov=authsome
+uv run pytest --cov=authsome
 ```
 
 Run linting and type checks:
 ```bash
 # Lint and auto-fix
-ruff check --fix src/ tests/
+uv run ruff check --fix src/ tests/
 
 # Format
-ruff format src/ tests/
+uv run ruff format src/ tests/
 
 # Type check
-ty check src/
+uv run ty check src/
 ```
 
 The CLI entry point after install:
 ```bash
-authsome init
-authsome login github
-authsome list
+uv run authsome init
+uv run authsome login github
+uv run authsome list
 ```
 
 ## Conventions

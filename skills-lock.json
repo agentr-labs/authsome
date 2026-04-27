@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "skills": {
+    "authsome": {
+      "source": "manojbajaj95/authsome",
+      "sourceType": "github",
+      "computedHash": "cb00c289279d6fe42c388637838f911ec06571120496fd095685ca27691d569d"
+    }
+  }
+}

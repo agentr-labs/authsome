@@ -3,30 +3,23 @@ Authsome — A portable local authentication library for AI agents and developer
 
 Provides credential management for third-party services with support for:
 - OAuth2 (PKCE, Device Code, DCR + PKCE)
-- API key management (prompt, env import)
+- API key management
 - Encrypted local storage (OS keyring or local file)
-- Cross-language compatible credential format
 
 Usage:
-    from authsome import AuthClient
+    from authsome import AuthsomeContext
 
-    client = AuthClient()
-    client.init()
-
-    # Login to a provider
-    client.login("openai")
-
-    # Get auth headers for API calls
-    headers = client.get_auth_headers("openai")
-
-    # Export credentials
-    env_vars = client.export("openai", format=ExportFormat.SHELL)
+    ctx = AuthsomeContext.create()
+    ctx.vault.init()
+    ctx.auth.login("openai")
+    headers = ctx.auth.get_auth_headers("openai")
 """
 
-from authsome.client import AuthClient
-from authsome.crypto.base import CryptoBackend
-from authsome.crypto.keyring_crypto import KeyringCryptoBackend
-from authsome.crypto.local_file_crypto import LocalFileCryptoBackend
+from authsome.auth import AuthLayer
+from authsome.auth.models.connection import ConnectionRecord, Sensitive
+from authsome.auth.models.enums import AuthType, ConnectionStatus, ExportFormat, FlowType
+from authsome.auth.models.provider import ProviderDefinition
+from authsome.context import AuthsomeContext
 from authsome.errors import (
     AuthenticationFailedError,
     AuthsomeError,
@@ -43,27 +36,23 @@ from authsome.errors import (
     UnsupportedAuthTypeError,
     UnsupportedFlowError,
 )
-from authsome.models.connection import ConnectionRecord, EncryptedField
-from authsome.models.enums import AuthType, ConnectionStatus, ExportFormat, FlowType
-from authsome.models.provider import ProviderDefinition
+from authsome.vault import Vault
 
-__version__ = "0.1.11"
+__version__ = "0.2.0"
 
 __all__ = [
     # Core
-    "AuthClient",
+    "AuthLayer",
+    "AuthsomeContext",
+    "Vault",
     # Models
     "AuthType",
+    "ConnectionRecord",
     "ConnectionStatus",
     "ExportFormat",
     "FlowType",
     "ProviderDefinition",
-    "ConnectionRecord",
-    "EncryptedField",
-    # Crypto backends
-    "CryptoBackend",
-    "KeyringCryptoBackend",
-    "LocalFileCryptoBackend",
+    "Sensitive",
     # Errors
     "AuthsomeError",
     "AuthenticationFailedError",

@@ -1,49 +1,97 @@
-"""Mitmproxy addon and server lifecycle for header injection.
-
-:class:`AuthProxyAddon` is a mitmproxy addon that intercepts outgoing requests,
-routes them through :class:`RequestRouter`, and injects provider auth headers
-via :meth:`AuthClient.get_auth_headers`.
-
-:func:`start_proxy_server` spins up a short-lived ``DumpMaster`` suitable for a
-single ``authsome proxy run`` invocation.
-"""
+"""Mitmproxy addon and server lifecycle for header injection."""
 
 from __future__ import annotations
 
 import logging
 import threading
-from dataclasses import dataclass
+from urllib.parse import urlparse
 
 from mitmproxy import http
 from mitmproxy.options import Options
 from mitmproxy.tools.dump import DumpMaster
 
-from authsome.client import AuthClient
-from authsome.proxy.router import RequestRouter
+from authsome.auth import AuthLayer
+from authsome.proxy.router import RouteMatch
 
 logger = logging.getLogger(__name__)
 
+_LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
 
-@dataclass
+
+def _route(auth: AuthLayer, scheme: str, host: str, port: int, path: str) -> RouteMatch | None:
+    """Return a RouteMatch when exactly one connected provider matches the request.
+
+    Returns None for loopback targets, OAuth endpoints, zero matches, or ambiguous matches.
+    """
+    if host in _LOOPBACK_HOSTS:
+        return None
+
+    matches: list[str] = []
+    for provider in auth.list_providers():
+        if not provider.host_url:
+            continue
+        if _is_auth_endpoint(provider, host, path):
+            continue
+        provider_host = _extract_host(provider.host_url)
+        if provider_host != host:
+            continue
+        try:
+            auth.get_connection(provider.name, "default")
+        except Exception:
+            continue
+        matches.append(provider.name)
+
+    if len(matches) == 0:
+        return None
+    if len(matches) > 1:
+        logger.warning(
+            "Ambiguous proxy match for %s://%s:%s%s — matched providers: %s. Forwarding unchanged.",
+            scheme,
+            host,
+            port,
+            path,
+            ", ".join(matches),
+        )
+        return None
+    return RouteMatch(provider=matches[0], connection="default")
+
+
+def _is_auth_endpoint(provider, host: str, path: str) -> bool:
+    if not provider.oauth:
+        return False
+    for raw_url in [
+        provider.oauth.authorization_url,
+        provider.oauth.token_url,
+        provider.oauth.revocation_url,
+        provider.oauth.device_authorization_url,
+    ]:
+        if not raw_url:
+            continue
+        parsed = urlparse(raw_url)
+        if parsed.hostname == host and parsed.path == path:
+            return True
+    return False
+
+
+def _extract_host(host_url: str) -> str:
+    if "://" in host_url:
+        return urlparse(host_url).hostname or host_url
+    return host_url
+
+
 class AuthProxyAddon:
     """Mitmproxy addon that injects auth headers for matched requests."""
 
-    client: AuthClient
-    router: RequestRouter
+    def __init__(self, auth: AuthLayer) -> None:
+        self._auth = auth
 
     def request(self, flow: http.HTTPFlow) -> None:
-        """Intercept outgoing requests and inject auth headers when matched."""
-        match = self.router.route(
-            flow.request.scheme,
-            flow.request.host,
-            flow.request.port,
-            flow.request.path,
-        )
+        match = _route(self._auth, flow.request.scheme, flow.request.host, flow.request.port, flow.request.path)
         if match is None:
             return
 
         try:
-            headers = self.client.get_auth_headers(match.provider, match.connection)
+            headers = self._auth.get_auth_headers(match.provider, match.connection)
         except Exception:
             logger.warning(
                 "Failed to retrieve auth headers for provider=%s connection=%s. Forwarding unchanged.",
@@ -52,18 +100,12 @@ class AuthProxyAddon:
             )
             return
 
-        # Always overwrite — authsome is the source of truth for credentials
         for key, value in headers.items():
             flow.request.headers[key] = value
 
 
-def build_addon(client: AuthClient) -> AuthProxyAddon:
-    """Create an :class:`AuthProxyAddon` wired to *client*."""
-    return AuthProxyAddon(client=client, router=RequestRouter(client))
-
-
 class RunningProxy:
-    """Handle for a proxy that is running in a background thread."""
+    """Handle for a proxy running in a background thread."""
 
     def __init__(self, url: str, master: DumpMaster, thread: threading.Thread) -> None:
         self.url = url
@@ -75,24 +117,11 @@ class RunningProxy:
         self.thread.join(timeout=5)
 
 
-def start_proxy_server(
-    client: AuthClient,
-    host: str = "127.0.0.1",
-    port: int = 0,
-) -> RunningProxy:
-    """Start a mitmproxy ``DumpMaster`` in a background thread.
-
-    Returns a :class:`RunningProxy` whose ``.url`` attribute contains the
-    ``http://host:port`` base URL suitable for ``HTTP_PROXY`` / ``HTTPS_PROXY``.
-
-    ``DumpMaster`` must be created inside an async context because its
-    ``__init__`` references the running event loop.  We create it inside
-    ``asyncio.run()`` in the background thread and use a
-    :class:`threading.Event` to hand the master reference back.
-    """
+def start_proxy_server(auth: AuthLayer, host: str = "127.0.0.1", port: int = 0) -> RunningProxy:
+    """Start a mitmproxy DumpMaster in a background thread."""
     import asyncio
 
-    from authsome.flows.bridge import _find_free_port
+    from authsome.auth.flows.bridge import _find_free_port
 
     if port == 0:
         port = _find_free_port()
@@ -104,7 +133,7 @@ def start_proxy_server(
         async def _async_main() -> None:
             opts = Options(listen_host=host, listen_port=port, ssl_insecure=True)
             master = DumpMaster(opts, with_termlog=False, with_dumper=False)
-            master.addons.add(build_addon(client))
+            master.addons.add(AuthProxyAddon(auth=auth))
             state["master"] = master
             ready.set()
             await master.run()

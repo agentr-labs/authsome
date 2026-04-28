@@ -313,7 +313,7 @@ def revoke(ctx_obj: ContextObj, provider: str) -> None:
     """Complete reset of the provider, removing all connections and client secrets."""
     actx = ctx_obj.initialize()
     actx.auth.revoke(provider)
-    actx.audit.log("reset", provider=provider, connection="all")
+    actx.audit.log("revoke", provider=provider, connection="all")
 
     if ctx_obj.json_output:
         ctx_obj.print_json({"status": "revoked", "provider": provider})

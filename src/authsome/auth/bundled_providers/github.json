@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "name": "github",
+  "display_name": "GitHub",
+  "auth_type": "oauth2",
+  "flow": "pkce",
+  "oauth": {
+    "base_url": "https://github.com",
+    "authorization_url": "{base_url}/login/oauth/authorize",
+    "token_url": "{base_url}/login/oauth/access_token",
+    "revocation_url": null,
+    "device_authorization_url": "{base_url}/login/device/code",
+    "scopes": [
+      "repo",
+      "read:user"
+    ],
+    "pkce": true,
+    "supports_device_flow": true,
+    "supports_dcr": false
+  },
+  "host_url": "api.github.com",
+  "export": {
+    "env": {
+      "access_token": "GITHUB_ACCESS_TOKEN",
+      "refresh_token": "GITHUB_REFRESH_TOKEN"
+    }
+  },
+  "docs": "https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens"
+}

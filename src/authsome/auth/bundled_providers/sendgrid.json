@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "name": "sendgrid",
+  "display_name": "SendGrid",
+  "auth_type": "api_key",
+  "flow": "api_key",
+  "host_url": "api.sendgrid.com",
+  "api_key": {
+    "header_name": "Authorization",
+    "header_prefix": "Bearer"
+  },
+  "export": {
+    "env": {
+      "api_key": "SENDGRID_API_KEY"
+    }
+  },
+  "docs": "https://www.twilio.com/docs/sendgrid/ui/account-and-settings/api-keys"
+}

@@ -51,24 +51,30 @@ class ProxyRouter:
             return None
 
         request_path = _request_path(path)
-        matches = [
-            target.match
+        matching_targets = [
+            target
             for target in self._routes_by_host.get(normalized_host, ())
             if _path_matches_prefix(request_path, target.path_prefix) and request_path not in target.auth_endpoint_paths
         ]
 
-        if len(matches) == 0:
+        if len(matching_targets) == 0:
             return None
-        if len(matches) > 1:
+
+        best_specificity = max(_path_prefix_specificity(target.path_prefix) for target in matching_targets)
+        best_targets = [
+            target for target in matching_targets if _path_prefix_specificity(target.path_prefix) == best_specificity
+        ]
+
+        if len(best_targets) > 1:
             logger.warning(
                 "Ambiguous proxy match for https://{}:{}{} — matched connections: {}. Forwarding unchanged.",
                 normalized_host,
                 port,
                 path,
-                ", ".join(f"{match.provider}/{match.connection}" for match in matches),
+                ", ".join(f"{target.match.provider}/{target.match.connection}" for target in best_targets),
             )
             return None
-        return matches[0]
+        return best_targets[0].match
 
     @staticmethod
     def _build_routes(auth: AuthLayer) -> dict[str, tuple[_RouteTarget, ...]]:
@@ -149,6 +155,10 @@ def _path_matches_prefix(request_path: str, path_prefix: str | None) -> bool:
     if path_prefix is None:
         return True
     return request_path == path_prefix or request_path.startswith(f"{path_prefix}/")
+
+
+def _path_prefix_specificity(path_prefix: str | None) -> int:
+    return len(path_prefix or "")
 
 
 def _auth_endpoint_paths(provider, host: str) -> frozenset[str]:

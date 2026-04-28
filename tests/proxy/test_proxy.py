@@ -94,6 +94,119 @@ class TestRouting:
         )
         assert router.route("https", "api.example.com", 443, "/v2/resources") is None
 
+    def test_more_specific_host_url_path_wins_over_host_only_route(self) -> None:
+        auth = Mock()
+        provider = Mock()
+        provider.oauth = None
+        provider.resolve_urls.return_value = provider
+        auth.get_provider.return_value = provider
+        auth.list_connections.return_value = [
+            {
+                "name": "root",
+                "connections": [
+                    {
+                        "connection_name": "default",
+                        "host_url": "api.example.com",
+                        "base_url": None,
+                    }
+                ],
+            },
+            {
+                "name": "v1",
+                "connections": [
+                    {
+                        "connection_name": "default",
+                        "host_url": "https://api.example.com/v1",
+                        "base_url": None,
+                    }
+                ],
+            },
+        ]
+
+        router = ProxyRouter(auth)
+
+        assert router.route("https", "api.example.com", 443, "/v1/resources") == RouteMatch(
+            provider="v1",
+            connection="default",
+        )
+        assert router.route("https", "api.example.com", 443, "/v2/resources") == RouteMatch(
+            provider="root",
+            connection="default",
+        )
+
+    def test_more_specific_nested_host_url_path_wins(self) -> None:
+        auth = Mock()
+        provider = Mock()
+        provider.oauth = None
+        provider.resolve_urls.return_value = provider
+        auth.get_provider.return_value = provider
+        auth.list_connections.return_value = [
+            {
+                "name": "v1",
+                "connections": [
+                    {
+                        "connection_name": "default",
+                        "host_url": "https://api.example.com/v1",
+                        "base_url": None,
+                    }
+                ],
+            },
+            {
+                "name": "beta",
+                "connections": [
+                    {
+                        "connection_name": "default",
+                        "host_url": "https://api.example.com/v1/beta",
+                        "base_url": None,
+                    }
+                ],
+            },
+        ]
+
+        router = ProxyRouter(auth)
+
+        assert router.route("https", "api.example.com", 443, "/v1/beta/resources") == RouteMatch(
+            provider="beta",
+            connection="default",
+        )
+        assert router.route("https", "api.example.com", 443, "/v1/resources") == RouteMatch(
+            provider="v1",
+            connection="default",
+        )
+
+    def test_equal_specificity_host_url_paths_remain_ambiguous(self) -> None:
+        auth = Mock()
+        provider = Mock()
+        provider.oauth = None
+        provider.resolve_urls.return_value = provider
+        auth.get_provider.return_value = provider
+        auth.list_connections.return_value = [
+            {
+                "name": "first",
+                "connections": [
+                    {
+                        "connection_name": "default",
+                        "host_url": "https://api.example.com/v1",
+                        "base_url": None,
+                    }
+                ],
+            },
+            {
+                "name": "second",
+                "connections": [
+                    {
+                        "connection_name": "default",
+                        "host_url": "https://api.example.com/v1",
+                        "base_url": None,
+                    }
+                ],
+            },
+        ]
+
+        router = ProxyRouter(auth)
+
+        assert router.route("https", "api.example.com", 443, "/v1/resources") is None
+
     def test_rejects_loopback_host(self, tmp_path: Path) -> None:
         auth = _make_auth(tmp_path)
 

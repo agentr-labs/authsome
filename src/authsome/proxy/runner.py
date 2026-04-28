@@ -10,14 +10,16 @@ from pathlib import Path
 from loguru import logger
 
 from authsome.auth import AuthLayer
+from authsome.audit import AuditLogger
 from authsome.proxy.server import RunningProxy, start_proxy_server
 
 
 class ProxyRunner:
     """Launch a subprocess behind the Authsome local auth proxy."""
 
-    def __init__(self, auth: AuthLayer) -> None:
+    def __init__(self, auth: AuthLayer, audit: AuditLogger) -> None:
         self._auth = auth
+        self._audit = audit
 
     def run(self, command: list[str]) -> subprocess.CompletedProcess[str]:
         """Run *command* behind the auth-injecting proxy."""
@@ -54,7 +56,7 @@ class ProxyRunner:
                     pass
 
     def _start_proxy(self) -> tuple[str, RunningProxy]:
-        server = start_proxy_server(self._auth)
+        server = start_proxy_server(self._auth, self._audit)
         return server.url, server
 
     def _inject_dummy_credentials(self, env: dict[str, str]) -> None:

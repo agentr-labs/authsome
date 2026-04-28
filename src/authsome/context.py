@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from authsome.auth import AuthLayer
     from authsome.proxy.runner import ProxyRunner
     from authsome.vault import Vault
+    from authsome.audit import AuditLogger
 
 
 @dataclass
@@ -26,6 +27,7 @@ class AuthsomeContext:
     vault: Vault
     auth: AuthLayer
     proxy: ProxyRunner
+    audit: AuditLogger
     home: Path
 
     @classmethod
@@ -33,6 +35,7 @@ class AuthsomeContext:
         cls,
         home: Path | None = None,
         profile: str | None = None,
+        no_audit: bool = False,
     ) -> AuthsomeContext:
         """Wire up all layers and return a ready-to-use context."""
         from authsome.auth import AuthLayer
@@ -41,6 +44,7 @@ class AuthsomeContext:
         from authsome.proxy.runner import ProxyRunner
         from authsome.vault import Vault
         from authsome.vault.storage import SQLiteStorage
+        from authsome.audit import AuditLogger
 
         resolved_home = home or Path(os.environ.get("AUTHSOME_HOME", str(Path.home() / ".authsome")))
         cls._ensure_initialized(resolved_home)
@@ -76,10 +80,11 @@ class AuthsomeContext:
         )
 
         registry = ProviderRegistry(providers_dir)
+        audit = AuditLogger(resolved_home / "audit.log", enabled=not no_audit)
         auth = AuthLayer(vault=vault, registry=registry, identity=identity, profiles_dir=profiles_dir)
-        proxy = ProxyRunner(auth=auth)
+        proxy = ProxyRunner(auth=auth, audit=audit)
 
-        return cls(vault=vault, auth=auth, proxy=proxy, home=resolved_home)
+        return cls(vault=vault, auth=auth, proxy=proxy, audit=audit, home=resolved_home)
 
     def doctor(self) -> dict[str, Any]:
         """Run diagnostic checks on the current environment."""

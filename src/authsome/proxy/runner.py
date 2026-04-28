@@ -84,17 +84,20 @@ class ProxyRunner:
         # Combine system CAs + mitmproxy CA into a temp file
         # We use a unique prefix to avoid collisions if multiple instances run
         fd, name = tempfile.mkstemp(prefix="authsome-ca-", suffix=".pem", text=True)
+        os.close(fd)  # Close immediately, we'll use Path.write_text
+        path = Path(name)
         try:
-            with os.fdopen(fd, "w") as tmp:
-                tmp.write(system_ca_path.read_text(encoding="utf-8"))
-                tmp.write("\n")
-                tmp.write(mitm_ca.read_text(encoding="utf-8"))
+            content = system_ca_path.read_text(encoding="utf-8") + "\n" + mitm_ca.read_text(encoding="utf-8")
+            path.write_text(content, encoding="utf-8")
         except Exception as e:
             logger.error("Failed to create combined CA bundle: {}", e)
-            os.close(fd)
+            try:
+                path.unlink(missing_ok=True)
+            except Exception:
+                pass
             return None
 
-        return Path(name)
+        return path
 
     @staticmethod
     def _merge_no_proxy(existing: str) -> str:

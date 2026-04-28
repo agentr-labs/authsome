@@ -11,7 +11,7 @@ from authsome.auth import AuthLayer
 from authsome.auth.input_provider import MockInputProvider
 from authsome.context import AuthsomeContext
 from authsome.proxy.router import RouteMatch
-from authsome.proxy.server import AuthProxyAddon, _route
+from authsome.proxy.server import AuthProxyAddon, ProxyRouter, _build_proxy_options, _route
 
 
 def _make_auth(tmp_path: Path) -> AuthLayer:
@@ -34,16 +34,120 @@ class TestRouting:
 
         assert match == RouteMatch(provider="openai", connection="default")
 
+    def test_rejects_plain_http_provider_host(self, tmp_path: Path) -> None:
+        auth = _make_auth(tmp_path)
+        auth.login("openai", force=True, input_provider=MockInputProvider({"api_key": "sk-test"}))
+
+        assert _route(auth, "http", "api.openai.com", 80, "/v1/responses") is None
+
+    def test_routes_single_named_connection(self, tmp_path: Path) -> None:
+        auth = _make_auth(tmp_path)
+        auth.login(
+            "openai",
+            connection_name="work",
+            force=True,
+            input_provider=MockInputProvider({"api_key": "sk-test"}),
+        )
+
+        match = _route(auth, "https", "api.openai.com", 443, "/v1/responses")
+
+        assert match == RouteMatch(provider="openai", connection="work")
+
+    def test_connection_override_selects_named_connection(self, tmp_path: Path) -> None:
+        auth = _make_auth(tmp_path)
+        auth.login("openai", force=True, input_provider=MockInputProvider({"api_key": "sk-default"}))
+        auth.login(
+            "openai",
+            connection_name="work",
+            force=True,
+            input_provider=MockInputProvider({"api_key": "sk-work"}),
+        )
+
+        router = ProxyRouter(auth, connection_overrides={"openai": "work"})
+
+        assert router.route("https", "api.openai.com", 443, "/v1/responses") == RouteMatch(
+            provider="openai",
+            connection="work",
+        )
+
+    def test_ambiguous_same_host_connections_are_not_routed(self, tmp_path: Path) -> None:
+        auth = _make_auth(tmp_path)
+        auth.login("openai", force=True, input_provider=MockInputProvider({"api_key": "sk-default"}))
+        auth.login(
+            "openai",
+            connection_name="work",
+            force=True,
+            input_provider=MockInputProvider({"api_key": "sk-work"}),
+        )
+
+        assert _route(auth, "https", "api.openai.com", 443, "/v1/responses") is None
+
+    def test_host_url_path_limits_routing(self) -> None:
+        auth = Mock()
+        provider = Mock()
+        provider.oauth = None
+        provider.resolve_urls.return_value = provider
+        auth.get_provider.return_value = provider
+        auth.list_connections.return_value = [
+            {
+                "name": "custom",
+                "connections": [
+                    {
+                        "connection_name": "default",
+                        "host_url": "https://api.example.com/v1",
+                        "base_url": None,
+                    }
+                ],
+            }
+        ]
+
+        router = ProxyRouter(auth)
+
+        assert router.route("https", "api.example.com", 443, "/v1/resources") == RouteMatch(
+            provider="custom",
+            connection="default",
+        )
+        assert router.route("https", "api.example.com", 443, "/v2/resources") is None
+
     def test_rejects_loopback_host(self, tmp_path: Path) -> None:
         auth = _make_auth(tmp_path)
 
         assert _route(auth, "http", "127.0.0.1", 8080, "/anything") is None
         assert _route(auth, "http", "localhost", 8080, "/anything") is None
+        assert _route(auth, "http", "::1", 8080, "/anything") is None
 
     def test_rejects_provider_token_endpoint(self, tmp_path: Path) -> None:
         auth = _make_auth(tmp_path)
 
         assert _route(auth, "https", "github.com", 443, "/login/oauth/access_token") is None
+
+    def test_rejects_connected_provider_auth_endpoint_with_query(self) -> None:
+        auth = Mock()
+        oauth = Mock()
+        oauth.authorization_url = "https://api.example.com/oauth/authorize"
+        oauth.token_url = "https://api.example.com/oauth/token"
+        oauth.revocation_url = None
+        oauth.device_authorization_url = None
+        provider = Mock()
+        provider.oauth = oauth
+        provider.resolve_urls.return_value = provider
+        auth.get_provider.return_value = provider
+        auth.list_connections.return_value = [
+            {
+                "name": "custom",
+                "connections": [
+                    {
+                        "connection_name": "default",
+                        "host_url": "api.example.com",
+                        "base_url": None,
+                    }
+                ],
+            }
+        ]
+
+        router = ProxyRouter(auth)
+
+        assert router.route("https", "api.example.com", 443, "/oauth/token?grant_type=refresh_token") is None
 
     def test_no_match_for_unknown_host(self, tmp_path: Path) -> None:
         auth = _make_auth(tmp_path)
@@ -71,26 +175,32 @@ class TestAuthProxyAddon:
         flow.request.headers = headers if headers is not None else {}
         return flow
 
+    def _make_addon(self, auth, match):
+        router = Mock()
+        router.route.return_value = match
+        with patch("authsome.proxy.server.ProxyRouter", return_value=router):
+            addon = AuthProxyAddon(auth=auth)
+        return addon, router
+
     def test_addon_injects_headers_for_matched_request(self) -> None:
         auth = Mock()
-        auth.list_providers.return_value = []
         flow = self._make_flow()
+        auth.get_auth_headers.return_value = {"Authorization": "Bearer sk-test"}
+        auth.get_connection.return_value.expires_at = None
 
-        addon = AuthProxyAddon(auth=auth)
-        with patch("authsome.proxy.server._route", return_value=RouteMatch(provider="openai", connection="default")):
-            auth.get_auth_headers.return_value = {"Authorization": "Bearer sk-test"}
-            addon.request(flow)
+        addon, _router = self._make_addon(auth, RouteMatch(provider="openai", connection="default"))
+        addon.request(flow)
 
         assert flow.request.headers["Authorization"] == "Bearer sk-test"
 
     def test_addon_overwrites_existing_authorization_header(self) -> None:
         auth = Mock()
         flow = self._make_flow(headers={"Authorization": "Bearer existing"})
+        auth.get_auth_headers.return_value = {"Authorization": "Bearer sk-authsome"}
+        auth.get_connection.return_value.expires_at = None
 
-        addon = AuthProxyAddon(auth=auth)
-        with patch("authsome.proxy.server._route", return_value=RouteMatch(provider="openai", connection="default")):
-            auth.get_auth_headers.return_value = {"Authorization": "Bearer sk-authsome"}
-            addon.request(flow)
+        addon, _router = self._make_addon(auth, RouteMatch(provider="openai", connection="default"))
+        addon.request(flow)
 
         assert flow.request.headers["Authorization"] == "Bearer sk-authsome"
 
@@ -98,9 +208,8 @@ class TestAuthProxyAddon:
         auth = Mock()
         flow = self._make_flow(host="example.com", path="/")
 
-        addon = AuthProxyAddon(auth=auth)
-        with patch("authsome.proxy.server._route", return_value=None):
-            addon.request(flow)
+        addon, _router = self._make_addon(auth, None)
+        addon.request(flow)
 
         auth.get_auth_headers.assert_not_called()
 
@@ -109,11 +218,21 @@ class TestAuthProxyAddon:
         auth.get_auth_headers.side_effect = RuntimeError("token expired")
         flow = self._make_flow()
 
-        addon = AuthProxyAddon(auth=auth)
-        with patch("authsome.proxy.server._route", return_value=RouteMatch(provider="openai", connection="default")):
-            addon.request(flow)
+        addon, _router = self._make_addon(auth, RouteMatch(provider="openai", connection="default"))
+        addon.request(flow)
 
         assert "Authorization" not in flow.request.headers
+
+    def test_addon_caches_headers_for_connection(self) -> None:
+        auth = Mock()
+        auth.get_auth_headers.return_value = {"Authorization": "Bearer sk-test"}
+        auth.get_connection.return_value.expires_at = None
+        addon, _router = self._make_addon(auth, RouteMatch(provider="openai", connection="default"))
+
+        addon.request(self._make_flow())
+        addon.request(self._make_flow())
+
+        auth.get_auth_headers.assert_called_once_with("openai", "default")
 
 
 # ── Runner tests ─────────────────────────────────────────────────────────
@@ -137,9 +256,12 @@ class TestProxyRunner:
         env = run_mock.call_args.kwargs["env"]
         assert env["HTTP_PROXY"] == "http://127.0.0.1:8899"
         assert env["HTTPS_PROXY"] == "http://127.0.0.1:8899"
+        assert env["http_proxy"] == "http://127.0.0.1:8899"
+        assert env["https_proxy"] == "http://127.0.0.1:8899"
         assert env["SSL_CERT_FILE"] == "/tmp/fake-ca.pem"
         assert "localhost" in env["NO_PROXY"]
         assert "127.0.0.1" in env["NO_PROXY"]
+        assert "::1" in env["NO_PROXY"]
         assert env.get("OPENAI_API_KEY") != "authsome-proxy-managed"
 
     def test_runner_injects_dummy_credentials_for_connected_providers(self, tmp_path: Path) -> None:
@@ -183,6 +305,16 @@ class TestProxyRunner:
         assert "10.0.0.1" in result
         assert "127.0.0.1" in result
         assert "localhost" in result
+        assert "::1" in result
+
+
+class TestProxyServer:
+    """Proxy server options and lifecycle helpers."""
+
+    def test_proxy_options_verify_upstream_tls(self, tmp_path: Path) -> None:
+        opts = _build_proxy_options("127.0.0.1", 0, tmp_path)
+
+        assert opts.ssl_insecure is False
 
 
 # ── Provider metadata tests ─────────────────────────────────────────────
@@ -230,6 +362,20 @@ class TestProxyCLI:
                 _result = runner.invoke(cli, ["run", "--", "echo", "hello"])
 
         run_mock.assert_called_once()
+
+    def test_run_parses_connection_overrides(self, tmp_path: Path) -> None:
+        from click.testing import CliRunner
+
+        from authsome.cli import cli
+
+        with patch("authsome.proxy.runner.ProxyRunner.run") as run_mock:
+            run_mock.return_value = Mock(returncode=0)
+            with patch("authsome.proxy.runner.ProxyRunner.__init__", return_value=None):
+                runner = CliRunner()
+                result = runner.invoke(cli, ["run", "--connection", "openai=work", "--", "echo", "hello"])
+
+        assert result.exit_code == 0
+        run_mock.assert_called_once_with(["echo", "hello"], connection_overrides={"openai": "work"})
 
 
 # ── Documentation tests ──────────────────────────────────────────────────

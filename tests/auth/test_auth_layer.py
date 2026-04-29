@@ -13,7 +13,7 @@ from authsome.auth import AuthLayer
 from authsome.auth.input_provider import MockInputProvider
 from authsome.auth.models.connection import ConnectionRecord, ProviderClientRecord
 from authsome.auth.models.enums import AuthType, ConnectionStatus, ExportFormat, FlowType
-from authsome.auth.models.provider import ApiKeyConfig, OAuthConfig, ProviderDefinition
+from authsome.auth.models.provider import ApiKeyConfig, ExportConfig, OAuthConfig, ProviderDefinition
 from authsome.context import AuthsomeContext
 from authsome.errors import (
     AuthsomeError,
@@ -697,6 +697,26 @@ class TestAuthLayerExport:
         output = auth.export("openai", format=ExportFormat.JSON)
         data = json.loads(output)
         assert data["OPENAI_API_KEY"] == "sk-json-padded-for-regex"
+
+    def test_export_all_connected_accounts(self, auth: AuthLayer) -> None:
+        custom = ProviderDefinition(
+            name="custom",
+            display_name="Custom",
+            auth_type=AuthType.API_KEY,
+            flow=FlowType.API_KEY,
+            api_key=ApiKeyConfig(),
+            export=ExportConfig(env={"api_key": "CUSTOM_API_KEY"}),
+        )
+        auth.register_provider(custom)
+
+        auth.login("openai", input_provider=MockInputProvider({"api_key": "sk-openai-padded-for-regex"}))
+        auth.login("custom", input_provider=MockInputProvider({"api_key": "sk-custom"}))
+
+        output = auth.export(format=ExportFormat.JSON)
+        data = json.loads(output)
+
+        assert data["CUSTOM_API_KEY"] == "sk-custom"
+        assert data["OPENAI_API_KEY"] == "sk-openai-padded-for-regex"
 
     def test_export_oauth_format(self, auth: AuthLayer, monkeypatch: pytest.MonkeyPatch) -> None:
         provider = ProviderDefinition(

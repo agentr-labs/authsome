@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from click.testing import CliRunner
 
+from authsome.auth.models.enums import ExportFormat
 from authsome.cli import cli
 from authsome.errors import AuthsomeError, ProviderNotFoundError, StoreUnavailableError
 
@@ -317,6 +318,16 @@ def test_export(runner, mock_ctx):
     mock_ctx.auth.export.return_value = ""
     result2 = runner.invoke(cli, ["export", "openai", "--format", "env"])
     assert result2.exit_code == 0
+
+
+def test_export_without_provider(runner, mock_ctx):
+    mock_ctx.auth.export.return_value = "OPENAI_API_KEY=sk-test"
+
+    result = runner.invoke(cli, ["export"])
+
+    assert result.exit_code == 0
+    assert "OPENAI_API_KEY=sk-test" in result.output
+    mock_ctx.auth.export.assert_called_with(None, "default", format=ExportFormat.ENV)
 
 
 def test_run(runner, mock_ctx):

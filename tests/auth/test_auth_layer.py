@@ -718,7 +718,6 @@ class TestAuthLayerExport:
         assert data["CUSTOM_API_KEY"] == "sk-custom"
         assert data["OPENAI_API_KEY"] == "sk-openai"
 
-
     def test_export_oauth_format(self, auth: AuthLayer, monkeypatch: pytest.MonkeyPatch) -> None:
         provider = ProviderDefinition(
             name="testexport",

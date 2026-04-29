@@ -3,6 +3,7 @@
 import functools
 import json as json_lib
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -120,6 +121,55 @@ def setup_logging(verbose: bool, log_file: Path | None) -> None:
         )
 
 
+def format_expires_at(expires_at: str | None) -> str | None:
+    """Return a compact relative expiry label for CLI output."""
+    if not expires_at:
+        return None
+    try:
+        expiry = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
+    except ValueError:
+        return f"expires at {expires_at}"
+    if expiry.tzinfo is None:
+        expiry = expiry.replace(tzinfo=UTC)
+
+    total_seconds = int((expiry - datetime.now(UTC)).total_seconds())
+    if total_seconds < 0:
+        label = _format_duration(-total_seconds)
+        return f"expired {label} ago"
+    label = _format_duration(total_seconds)
+    return f"expires in {label}"
+
+
+def connection_is_active(connection: dict[str, Any]) -> bool:
+    """Return whether a connection should count as actively connected."""
+    if connection.get("status") != "connected":
+        return False
+
+    expires_at = connection.get("expires_at")
+    if not expires_at:
+        return True
+    try:
+        expiry = datetime.fromisoformat(str(expires_at).replace("Z", "+00:00"))
+    except ValueError:
+        return True
+    if expiry.tzinfo is None:
+        expiry = expiry.replace(tzinfo=UTC)
+    return datetime.now(UTC) < expiry
+
+
+def _format_duration(total_seconds: int) -> str:
+    if total_seconds < 60:
+        return f"{total_seconds}s"
+    minutes = total_seconds // 60
+    if minutes < 60:
+        return f"{minutes}m"
+    hours = minutes // 60
+    if hours < 48:
+        return f"{hours}h"
+    days = hours // 24
+    return f"{days}d"
+
+
 @click.group()
 @click.version_option(__version__, "-v", "--version")
 @click.option("--verbose", is_flag=True, default=False, help="Enable DEBUG logging to stderr.")
@@ -181,25 +231,76 @@ def list_cmd(ctx_obj: ContextObj) -> None:
         ctx_obj.print_json({"bundled": bundled_out, "custom": custom_out})
         return
 
-    def print_provider_section(label: str, providers: list[dict]) -> None:
-        ctx_obj.echo(f"\n{label}:")
-        if not providers:
-            ctx_obj.echo("  (none)")
-            return
-        for p in providers:
-            ctx_obj.echo(f"  {p['display_name']}  [{p['name']}]")
-            conns = p["connections"]
-            if conns:
-                for c in conns:
-                    status = c["status"]
-                    color = "green" if status == "connected" else "yellow"
-                    ctx_obj.echo(f"    {c['connection_name']}  ", nl=False)
-                    ctx_obj.echo(status, color=color)
-            else:
-                ctx_obj.echo("    (no connections)", color="yellow")
+    rows: list[dict[str, Any]] = []
+    for p in bundled_out + custom_out:
+        provider_label = f"{p['display_name']} [{p['name']}]"
+        if p["connections"]:
+            for conn in p["connections"]:
+                rows.append(
+                    {
+                        "provider_id": p["name"],
+                        "provider": provider_label,
+                        "source": p["source"],
+                        "auth": p["auth_type"],
+                        "connection": conn["connection_name"],
+                        "status": conn["status"],
+                        "expires_at": conn.get("expires_at"),
+                        "expires": format_expires_at(conn.get("expires_at")) or "-",
+                    }
+                )
+        else:
+            rows.append(
+                {
+                    "provider_id": p["name"],
+                    "provider": provider_label,
+                    "source": p["source"],
+                    "auth": p["auth_type"],
+                    "connection": "-",
+                    "status": "not_connected",
+                    "expires_at": None,
+                    "expires": "-",
+                }
+            )
 
-    print_provider_section("Bundled Providers", bundled_out)
-    print_provider_section("Custom Providers", custom_out)
+    if not rows:
+        ctx_obj.echo("No providers configured.")
+        return
+
+    connected_provider_ids = {row["provider_id"] for row in rows if connection_is_active(row)}
+    connected_count = len(connected_provider_ids)
+    ctx_obj.echo(f"Providers: {len(bundled_out) + len(custom_out)} total, {connected_count} connected")
+
+    headers = {
+        "provider": "Provider",
+        "source": "Source",
+        "auth": "Auth",
+        "connection": "Connection",
+        "status": "Status",
+        "expires": "Expires",
+    }
+    widths = {
+        key: max(len(headers[key]), *(len(row[key]) for row in rows))
+        for key in ("provider", "source", "auth", "connection", "status", "expires")
+    }
+
+    def render_row(row: dict[str, Any]) -> str:
+        return (
+            f"{row['provider']:<{widths['provider']}}  "
+            f"{row['source']:<{widths['source']}}  "
+            f"{row['auth']:<{widths['auth']}}  "
+            f"{row['connection']:<{widths['connection']}}  "
+            f"{row['status']:<{widths['status']}}  "
+            f"{row['expires']:<{widths['expires']}}"
+        ).rstrip()
+
+    ctx_obj.echo(render_row(headers))
+    ctx_obj.echo(
+        render_row(
+            {key: "-" * widths[key] for key in ("provider", "source", "auth", "connection", "status", "expires")}
+        )
+    )
+    for row in rows:
+        ctx_obj.echo(render_row(row))
 
 
 @cli.command(name="log")
@@ -268,7 +369,7 @@ def login(
         ctx_obj.echo(f"Starting login for {provider}...", color="cyan")
 
     try:
-        record = actx.auth.login(
+        login_result = actx.auth.login_with_result(
             provider=provider,
             connection_name=connection,
             scopes=scope_list,
@@ -276,6 +377,7 @@ def login(
             force=force,
             base_url=base_url,
         )
+        record = login_result.record
         audit.log("login", provider=provider, connection=connection, flow=record.auth_type.value, status="success")
     except Exception:
         audit.log("login", provider=provider, connection=connection, status="failure")
@@ -283,8 +385,15 @@ def login(
 
     if ctx_obj.json_output:
         ctx_obj.print_json(
-            {"status": "success", "provider": provider, "connection": connection, "record_status": record.status.value}
+            {
+                "status": "already_connected" if login_result.already_connected else "success",
+                "provider": provider,
+                "connection": connection,
+                "record_status": record.status.value,
+            }
         )
+    elif login_result.already_connected:
+        ctx_obj.echo(f"Already logged in to {provider} ({connection}).", color="green")
     else:
         ctx_obj.echo(f"Successfully logged in to {provider} ({connection}).", color="green")
 
@@ -387,6 +496,12 @@ def inspect(ctx_obj: ContextObj, provider: str) -> None:
     actx = ctx_obj.initialize()
     definition = actx.auth.get_provider(provider)
     data = definition.model_dump(mode="json")
+    data["connections"] = []
+    for provider_group in actx.auth.list_connections():
+        if provider_group["name"] == provider:
+            data["connections"] = provider_group["connections"]
+            break
+
     if ctx_obj.json_output:
         ctx_obj.print_json(data)
     else:
@@ -394,13 +509,13 @@ def inspect(ctx_obj: ContextObj, provider: str) -> None:
 
 
 @cli.command()
-@click.argument("provider")
+@click.argument("provider", required=False)
 @click.option("--connection", default="default", help="Connection name.")
 @click.option("--format", "export_format", type=click.Choice(["env", "json"]), default="env")
 @common_options
 @pass_ctx
 @handle_errors
-def export(ctx_obj: ContextObj, provider: str, connection: str, export_format: str) -> None:
+def export(ctx_obj: ContextObj, provider: str | None, connection: str, export_format: str) -> None:
     """Export credential material in selected format."""
     actx = ctx_obj.initialize()
     fmt = ExportFormat(export_format)
@@ -486,13 +601,33 @@ def whoami(ctx_obj: ContextObj) -> None:
 
     data = {
         "home_directory": str(home),
+        "active_profile": actx.auth.identity,
+        "authsome_version": __version__,
         "encryption_mode": config.encryption.mode if config.encryption else "local_key",
+        "connected_providers_count": 0,
+        "connected_providers": [],
     }
+    connected_providers = sorted(
+        {
+            provider_group["name"]
+            for provider_group in actx.auth.list_connections()
+            if any(connection_is_active(connection) for connection in provider_group["connections"])
+        }
+    )
+    data["connected_providers_count"] = len(connected_providers)
+    data["connected_providers"] = connected_providers
+
     if ctx_obj.json_output:
         ctx_obj.print_json(data)
     else:
         ctx_obj.echo(f"Home Directory: {data['home_directory']}")
+        ctx_obj.echo(f"Active Profile: {data['active_profile']}")
+        ctx_obj.echo(f"Authsome Version: {data['authsome_version']}")
         ctx_obj.echo(f"Encryption Mode: {data['encryption_mode']}")
+        ctx_obj.echo(f"Connected Providers: {data['connected_providers_count']}")
+        if connected_providers:
+            for provider in connected_providers:
+                ctx_obj.echo(f"  {provider}")
 
 
 @cli.command()

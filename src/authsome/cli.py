@@ -10,6 +10,7 @@ import click
 from loguru import logger
 
 from authsome import __version__
+from authsome import audit
 from authsome.auth.models.enums import ExportFormat, FlowType
 from authsome.context import AuthsomeContext
 from authsome.errors import AuthsomeError
@@ -29,6 +30,7 @@ class ContextObj:
     def initialize(self) -> AuthsomeContext:
         if self._ctx is None:
             self._ctx = AuthsomeContext.create(no_audit=self.no_audit)
+            audit.setup(self._ctx.home / "audit.log", enabled=not self.no_audit)
         return self._ctx
 
     def print_json(self, data: Any) -> None:
@@ -280,9 +282,9 @@ def login(
             force=force,
             base_url=base_url,
         )
-        actx.audit.log("login", provider=provider, connection=connection, flow=record.auth_type.value, status="success")
+        audit.log("login", provider=provider, connection=connection, flow=record.auth_type.value, status="success")
     except Exception:
-        actx.audit.log("login", provider=provider, connection=connection, status="failure")
+        audit.log("login", provider=provider, connection=connection, status="failure")
         raise
 
     if ctx_obj.json_output:
@@ -303,7 +305,7 @@ def logout(ctx_obj: ContextObj, provider: str, connection: str) -> None:
     """Log out of a connection and remove local state."""
     actx = ctx_obj.initialize()
     actx.auth.logout(provider, connection)
-    actx.audit.log("logout", provider=provider, connection=connection)
+    audit.log("logout", provider=provider, connection=connection)
 
     if ctx_obj.json_output:
         ctx_obj.print_json({"status": "logged_out", "provider": provider, "connection": connection})
@@ -320,7 +322,7 @@ def revoke(ctx_obj: ContextObj, provider: str) -> None:
     """Complete reset of the provider, removing all connections and client secrets."""
     actx = ctx_obj.initialize()
     actx.auth.revoke(provider)
-    actx.audit.log("revoke", provider=provider, connection="all")
+    audit.log("revoke", provider=provider, connection="all")
 
     if ctx_obj.json_output:
         ctx_obj.print_json({"status": "revoked", "provider": provider})
@@ -337,7 +339,7 @@ def remove(ctx_obj: ContextObj, provider: str) -> None:
     """Uninstall a local provider or reset a bundled one."""
     actx = ctx_obj.initialize()
     actx.auth.remove(provider)
-    actx.audit.log("remove", provider=provider, connection="all")
+    audit.log("remove", provider=provider, connection="all")
 
     if ctx_obj.json_output:
         ctx_obj.print_json({"status": "removed", "provider": provider})
@@ -359,7 +361,7 @@ def get(ctx_obj: ContextObj, provider: str, connection: str, field: str | None, 
     record = actx.auth.get_connection(provider, connection)
 
     if show_secret:
-        actx.audit.log("get", provider=provider, connection=connection, field=field or "all")
+        audit.log("get", provider=provider, connection=connection, field=field or "all")
 
     data = redact(record) if not show_secret else record.model_dump(mode="json")
 
@@ -409,7 +411,7 @@ def export(ctx_obj: ContextObj, provider: str, connection: str, export_format: s
     actx = ctx_obj.initialize()
     fmt = ExportFormat(export_format)
     output = actx.auth.export(provider, connection, format=fmt)
-    actx.audit.log("export", provider=provider, connection=connection, format=export_format)
+    audit.log("export", provider=provider, connection=connection, format=export_format)
     if output:
         click.echo(output)
 
@@ -459,7 +461,7 @@ def register(ctx_obj: ContextObj, path: str, force: bool) -> None:
             ]
             if ep
         ]
-        actx.audit.log("register", provider=definition.name, endpoints=endpoints)
+        audit.log("register", provider=definition.name, endpoints=endpoints)
 
         if ctx_obj.json_output:
             ctx_obj.print_json({"status": "registered", "provider": definition.name})

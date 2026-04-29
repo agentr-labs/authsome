@@ -45,3 +45,19 @@ class AuditLogger:
                 f.write(json.dumps(entry) + "\n")
         except Exception as e:
             logger.error("Failed to write to audit log at {}: {}", self.filepath, e)
+
+
+_logger_instance: AuditLogger | None = None
+
+
+def setup(filepath: Path, enabled: bool = True) -> None:
+    """Initialize the global audit logger singleton."""
+    global _logger_instance
+    _logger_instance = AuditLogger(filepath, enabled=enabled)
+
+
+def log(event_type: str, **kwargs: Any) -> None:
+    """Write an event to the global audit log."""
+    if _logger_instance is not None:
+        _logger_instance.log(event_type, **kwargs)
+

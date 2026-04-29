@@ -14,7 +14,6 @@ from typing import TYPE_CHECKING, Any
 from loguru import logger
 
 if TYPE_CHECKING:
-    from authsome.audit import AuditLogger
     from authsome.auth import AuthLayer
     from authsome.proxy.runner import ProxyRunner
     from authsome.vault import Vault
@@ -27,7 +26,6 @@ class AuthsomeContext:
     vault: Vault
     auth: AuthLayer
     proxy: ProxyRunner
-    audit: AuditLogger
     home: Path
 
     @classmethod
@@ -38,7 +36,6 @@ class AuthsomeContext:
         no_audit: bool = False,
     ) -> AuthsomeContext:
         """Wire up all layers and return a ready-to-use context."""
-        from authsome.audit import AuditLogger
         from authsome.auth import AuthLayer
         from authsome.auth.models.config import GlobalConfig
         from authsome.auth.providers.registry import ProviderRegistry
@@ -80,11 +77,10 @@ class AuthsomeContext:
         )
 
         registry = ProviderRegistry(providers_dir)
-        audit = AuditLogger(resolved_home / "audit.log", enabled=not no_audit)
         auth = AuthLayer(vault=vault, registry=registry, identity=identity, profiles_dir=profiles_dir)
-        proxy = ProxyRunner(auth=auth, audit=audit)
+        proxy = ProxyRunner(auth=auth)
 
-        return cls(vault=vault, auth=auth, proxy=proxy, audit=audit, home=resolved_home)
+        return cls(vault=vault, auth=auth, proxy=proxy, home=resolved_home)
 
     def doctor(self) -> dict[str, Any]:
         """Run diagnostic checks on the current environment."""

@@ -11,14 +11,14 @@ from mitmproxy import http
 from mitmproxy.options import Options
 from mitmproxy.tools.dump import DumpMaster
 
-from authsome.audit import AuditLogger
+from authsome import audit
 from authsome.auth import AuthLayer
 from authsome.proxy.router import RouteMatch
 
 _LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
 
 
-def _route(auth: AuthLayer, audit: AuditLogger, scheme: str, host: str, port: int, path: str) -> RouteMatch | None:
+def _route(auth: AuthLayer, scheme: str, host: str, port: int, path: str) -> RouteMatch | None:
     """Return a RouteMatch when exactly one connected provider matches the request.
 
     Returns None for loopback targets, OAuth endpoints, zero matches, or ambiguous matches.
@@ -105,13 +105,12 @@ def _extract_host(host_url: str) -> str:
 class AuthProxyAddon:
     """Mitmproxy addon that injects auth headers for matched requests."""
 
-    def __init__(self, auth: AuthLayer, audit: AuditLogger) -> None:
+    def __init__(self, auth: AuthLayer) -> None:
         self._auth = auth
-        self._audit = audit
 
     def request(self, flow: http.HTTPFlow) -> None:
         match = _route(
-            self._auth, self._audit, flow.request.scheme, flow.request.host, flow.request.port, flow.request.path
+            self._auth, flow.request.scheme, flow.request.host, flow.request.port, flow.request.path
         )
         if match is None:
             return
@@ -129,7 +128,7 @@ class AuthProxyAddon:
         for key, value in headers.items():
             flow.request.headers[key] = value
 
-        self._audit.log(
+        audit.log(
             "proxy_injection",
             provider=match.provider,
             matched_host=flow.request.host,
@@ -157,7 +156,7 @@ class RunningProxy:
         self.thread.join(timeout=5)
 
 
-def start_proxy_server(auth: AuthLayer, audit: AuditLogger, host: str = "127.0.0.1", port: int = 0) -> RunningProxy:
+def start_proxy_server(auth: AuthLayer, host: str = "127.0.0.1", port: int = 0) -> RunningProxy:
     """Start a mitmproxy DumpMaster in a background thread."""
     import asyncio
 
@@ -181,7 +180,7 @@ def start_proxy_server(auth: AuthLayer, audit: AuditLogger, host: str = "127.0.0
                 confdir=str(confdir),
             )
             master = DumpMaster(opts, with_termlog=False, with_dumper=False)
-            master.addons.add(AuthProxyAddon(auth=auth, audit=audit))
+            master.addons.add(AuthProxyAddon(auth=auth))
             state["master"] = master
             ready.set()
             await master.run()

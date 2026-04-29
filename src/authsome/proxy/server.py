@@ -15,7 +15,6 @@ from mitmproxy import http
 from mitmproxy.options import Options
 from mitmproxy.tools.dump import DumpMaster
 
-from authsome import audit
 from authsome.auth import AuthLayer
 from authsome.proxy.router import RouteMatch
 from authsome.utils import utc_now
@@ -284,13 +283,33 @@ class AuthProxyAddon:
         for key, value in headers.items():
             flow.request.headers[key] = value
 
-        audit.log(
-            "proxy_injection",
-            provider=match.provider,
-            matched_host=flow.request.host,
-            request_method=flow.request.method,
-            request_path=flow.request.path,
-        )
+    def _get_auth_headers(self, match: RouteMatch) -> dict[str, str]:
+        cache_key = (match.provider, match.connection)
+        now = utc_now()
+        cached = self._header_cache.get(cache_key)
+        if cached and _header_cache_valid(cached, now):
+            return cached.headers.copy()
+
+        lock = self._header_locks.setdefault(cache_key, threading.Lock())
+        with lock:
+            now = utc_now()
+            cached = self._header_cache.get(cache_key)
+            if cached and _header_cache_valid(cached, now):
+                return cached.headers.copy()
+
+            headers = self._auth.get_auth_headers(match.provider, match.connection)
+            record = self._auth.get_connection(match.provider, match.connection)
+            self._header_cache[cache_key] = _HeaderCacheEntry(
+                headers=headers.copy(),
+                expires_at=record.expires_at,
+            )
+            return headers
+
+
+def _header_cache_valid(entry: _HeaderCacheEntry, now: datetime) -> bool:
+    if entry.expires_at is None:
+        return True
+    return now < entry.expires_at - _HEADER_REFRESH_WINDOW
 
     def _get_auth_headers(self, match: RouteMatch) -> dict[str, str]:
         cache_key = (match.provider, match.connection)

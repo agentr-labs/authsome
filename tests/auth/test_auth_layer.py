@@ -143,12 +143,71 @@ class TestAuthLayerLogin:
         assert conn.status == ConnectionStatus.CONNECTED
 
     def test_login_connection_exists(self, auth: AuthLayer) -> None:
+        first = auth.login("openai", "default", input_provider=MockInputProvider({"api_key": "sk-1"}))
+
+        second = auth.login("openai", "default", force=False)
+        assert second.api_key == "sk-1"
+        assert second.obtained_at == first.obtained_at
+
+        forced = auth.login("openai", "default", force=True, input_provider=MockInputProvider({"api_key": "sk-2"}))
+        assert forced.api_key == "sk-2"
+
+    def test_login_with_result_marks_existing_valid_connection(self, auth: AuthLayer) -> None:
         auth.login("openai", "default", input_provider=MockInputProvider({"api_key": "sk-1"}))
 
-        with pytest.raises(AuthsomeError, match="already exists"):
-            auth.login("openai", "default", force=False)
+        result = auth.login_with_result("openai", "default")
 
-        auth.login("openai", "default", force=True, input_provider=MockInputProvider({"api_key": "sk-2"}))
+        assert result.already_connected is True
+        assert result.record.api_key == "sk-1"
+
+    def test_login_reauthenticates_expired_connection(self, auth: AuthLayer) -> None:
+        from authsome.auth.flows.base import FlowResult
+
+        provider = ProviderDefinition(
+            name="testoauth-expired",
+            display_name="Test OAuth Expired",
+            auth_type=AuthType.OAUTH2,
+            flow=FlowType.PKCE,
+            oauth=OAuthConfig(authorization_url="http://auth", token_url="http://token"),
+        )
+        auth.register_provider(provider)
+        auth._save_provider_client_credentials(
+            ProviderClientRecord(profile="default", provider="testoauth-expired", client_id="cid")
+        )
+        auth._save_connection(
+            ConnectionRecord(
+                schema_version=2,
+                provider="testoauth-expired",
+                profile="default",
+                connection_name="default",
+                auth_type=AuthType.OAUTH2,
+                status=ConnectionStatus.CONNECTED,
+                access_token="old",
+                expires_at=utc_now() - timedelta(seconds=1),
+            )
+        )
+
+        replacement = ConnectionRecord(
+            schema_version=2,
+            provider="testoauth-expired",
+            profile="default",
+            connection_name="default",
+            auth_type=AuthType.OAUTH2,
+            status=ConnectionStatus.CONNECTED,
+            access_token="new",
+            expires_at=utc_now() + timedelta(hours=1),
+        )
+
+        with patch("authsome.auth._FLOW_HANDLERS") as handlers:
+            mock_handler = MagicMock()
+            mock_handler.authenticate.return_value = FlowResult(connection=replacement)
+            handlers.get.return_value = lambda: mock_handler
+
+            result = auth.login_with_result("testoauth-expired", scopes=[])
+
+        assert result.already_connected is False
+        assert result.record.access_token == "new"
+        mock_handler.authenticate.assert_called_once()
 
     def test_login_unsupported_flow(self, auth: AuthLayer) -> None:
         def mock_get_provider(name):

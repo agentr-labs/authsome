@@ -230,7 +230,7 @@ def login(
     if not ctx_obj.json_output:
         ctx_obj.echo(f"Starting login for {provider}...", color="cyan")
 
-    record = actx.auth.login(
+    login_result = actx.auth.login_with_result(
         provider=provider,
         connection_name=connection,
         scopes=scope_list,
@@ -238,11 +238,19 @@ def login(
         force=force,
         base_url=base_url,
     )
+    record = login_result.record
 
     if ctx_obj.json_output:
         ctx_obj.print_json(
-            {"status": "success", "provider": provider, "connection": connection, "record_status": record.status.value}
+            {
+                "status": "already_connected" if login_result.already_connected else "success",
+                "provider": provider,
+                "connection": connection,
+                "record_status": record.status.value,
+            }
         )
+    elif login_result.already_connected:
+        ctx_obj.echo(f"Already logged in to {provider} ({connection}).", color="green")
     else:
         ctx_obj.echo(f"Successfully logged in to {provider} ({connection}).", color="green")
 

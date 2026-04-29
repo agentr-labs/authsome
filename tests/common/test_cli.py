@@ -1,6 +1,7 @@
 """Tests for the Authsome CLI."""
 
 import json
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -91,22 +92,32 @@ def test_list_json(runner, mock_ctx):
 def test_login_command(runner, mock_ctx):
     mock_record = MagicMock()
     mock_record.status.value = "connected"
-    mock_ctx.auth.login.return_value = mock_record
+    mock_ctx.auth.login_with_result.return_value = SimpleNamespace(record=mock_record, already_connected=False)
 
     result = runner.invoke(cli, ["login", "openai"])
     assert result.exit_code == 0
     assert "Successfully logged in to openai" in result.output
 
 
+def test_login_command_already_connected(runner, mock_ctx):
+    mock_record = MagicMock()
+    mock_record.status.value = "connected"
+    mock_ctx.auth.login_with_result.return_value = SimpleNamespace(record=mock_record, already_connected=True)
+
+    result = runner.invoke(cli, ["login", "openai"])
+    assert result.exit_code == 0
+    assert "Already logged in to openai" in result.output
+
+
 def test_login_with_scopes_flag(runner, mock_ctx):
     mock_record = MagicMock()
     mock_record.status.value = "connected"
-    mock_ctx.auth.login.return_value = mock_record
+    mock_ctx.auth.login_with_result.return_value = SimpleNamespace(record=mock_record, already_connected=False)
 
     result = runner.invoke(cli, ["login", "github", "--scopes", "repo,user"])
     assert result.exit_code == 0
 
-    mock_ctx.auth.login.assert_called_with(
+    mock_ctx.auth.login_with_result.assert_called_with(
         provider="github",
         connection_name="default",
         scopes=["repo", "user"],
@@ -119,7 +130,7 @@ def test_login_with_scopes_flag(runner, mock_ctx):
 def test_login_json(runner, mock_ctx):
     mock_record = MagicMock()
     mock_record.status.value = "connected"
-    mock_ctx.auth.login.return_value = mock_record
+    mock_ctx.auth.login_with_result.return_value = SimpleNamespace(record=mock_record, already_connected=False)
 
     result = runner.invoke(cli, ["login", "openai", "--json"])
     assert result.exit_code == 0
@@ -127,8 +138,19 @@ def test_login_json(runner, mock_ctx):
     assert data["status"] == "success"
 
 
+def test_login_json_already_connected(runner, mock_ctx):
+    mock_record = MagicMock()
+    mock_record.status.value = "connected"
+    mock_ctx.auth.login_with_result.return_value = SimpleNamespace(record=mock_record, already_connected=True)
+
+    result = runner.invoke(cli, ["login", "openai", "--json"])
+    assert result.exit_code == 0
+    data = json.loads(result.output)
+    assert data["status"] == "already_connected"
+
+
 def test_login_error(runner, mock_ctx):
-    mock_ctx.auth.login.side_effect = AuthsomeError("Already exists")
+    mock_ctx.auth.login_with_result.side_effect = AuthsomeError("Already exists")
     result = runner.invoke(cli, ["login", "openai"])
     assert result.exit_code == 1
     assert "Error: Already exists" in result.output
@@ -141,27 +163,27 @@ def test_error_mapping(runner, mock_ctx):
         RefreshFailedError,
     )
 
-    mock_ctx.auth.login.side_effect = ProviderNotFoundError("test")
+    mock_ctx.auth.login_with_result.side_effect = ProviderNotFoundError("test")
     result = runner.invoke(cli, ["login", "test"])
     assert result.exit_code == 3
 
-    mock_ctx.auth.login.side_effect = StoreUnavailableError("locked")
+    mock_ctx.auth.login_with_result.side_effect = StoreUnavailableError("locked")
     result = runner.invoke(cli, ["login", "test"])
     assert result.exit_code == 7
 
-    mock_ctx.auth.login.side_effect = AuthenticationFailedError("fail")
+    mock_ctx.auth.login_with_result.side_effect = AuthenticationFailedError("fail")
     result = runner.invoke(cli, ["login", "test"])
     assert result.exit_code == 4
 
-    mock_ctx.auth.login.side_effect = CredentialMissingError("missing", provider="test")
+    mock_ctx.auth.login_with_result.side_effect = CredentialMissingError("missing", provider="test")
     result = runner.invoke(cli, ["login", "test"])
     assert result.exit_code == 5
 
-    mock_ctx.auth.login.side_effect = RefreshFailedError("refresh fail", provider="test")
+    mock_ctx.auth.login_with_result.side_effect = RefreshFailedError("refresh fail", provider="test")
     result = runner.invoke(cli, ["login", "test"])
     assert result.exit_code == 6
 
-    mock_ctx.auth.login.side_effect = Exception("unknown")
+    mock_ctx.auth.login_with_result.side_effect = Exception("unknown")
     result = runner.invoke(cli, ["login", "test"])
     assert result.exit_code == 1
 
@@ -433,7 +455,7 @@ def test_doctor_all_ok(runner, mock_ctx):
 
 
 def test_common_options_error_handling_json(runner, mock_ctx):
-    mock_ctx.auth.login.side_effect = AuthsomeError("Error")
+    mock_ctx.auth.login_with_result.side_effect = AuthsomeError("Error")
     result = runner.invoke(cli, ["login", "openai", "--json"])
     assert result.exit_code == 1
     data = json.loads(result.output)

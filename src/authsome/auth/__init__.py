@@ -8,6 +8,7 @@ Does not touch encryption directly — all persistence goes through the Vault.
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import Path
 from typing import Any
@@ -50,6 +51,14 @@ _FLOW_HANDLERS: dict[FlowType, type[AuthFlow]] = {
     FlowType.DCR_PKCE: DcrPkceFlow,
     FlowType.API_KEY: ApiKeyFlow,
 }
+
+
+@dataclass(frozen=True)
+class LoginResult:
+    """Result of a login attempt."""
+
+    record: ConnectionRecord
+    already_connected: bool = False
 
 
 class AuthLayer:
@@ -158,15 +167,33 @@ class AuthLayer:
         input_provider: InputProvider | None = None,
         base_url: str | None = None,
     ) -> ConnectionRecord:
+        return self.login_with_result(
+            provider=provider,
+            connection_name=connection_name,
+            scopes=scopes,
+            flow_override=flow_override,
+            force=force,
+            input_provider=input_provider,
+            base_url=base_url,
+        ).record
+
+    def login_with_result(
+        self,
+        provider: str,
+        connection_name: str = "default",
+        scopes: list[str] | None = None,
+        flow_override: FlowType | None = None,
+        force: bool = False,
+        input_provider: InputProvider | None = None,
+        base_url: str | None = None,
+    ) -> LoginResult:
         definition = self.get_provider(provider)
 
         try:
             existing = self.get_connection(provider, connection_name)
             if existing and not force:
-                raise AuthsomeError(
-                    f"Connection '{connection_name}' for provider '{provider}' already exists. "
-                    "Use --force to overwrite."
-                )
+                if self._connection_is_valid(existing):
+                    return LoginResult(record=existing, already_connected=True)
         except ConnectionNotFoundError:
             pass
 
@@ -303,7 +330,15 @@ class AuthLayer:
         self._update_provider_metadata(provider, connection_name)
 
         logger.info("Login successful: provider={} connection={} profile={}", provider, connection_name, self._identity)
-        return result.connection
+        return LoginResult(record=result.connection)
+
+    @staticmethod
+    def _connection_is_valid(record: ConnectionRecord) -> bool:
+        if record.status != ConnectionStatus.CONNECTED:
+            return False
+        if record.expires_at is None:
+            return True
+        return utc_now() < record.expires_at
 
     @staticmethod
     def _build_docs_hints(definition: ProviderDefinition, flow_type: FlowType) -> list[dict[str, Any]]:

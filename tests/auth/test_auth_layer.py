@@ -683,13 +683,13 @@ class TestAuthLayerLifecycle:
 class TestAuthLayerExport:
     """Export operations tests."""
 
-    def test_export_env_format(self, auth: AuthLayer) -> None:
+    def test_export_env_format(self, auth: AuthLayer, monkeypatch: pytest.MonkeyPatch) -> None:
         auth.login("openai", input_provider=MockInputProvider({"api_key": "sk-export-padded-for-regex"}))
 
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
         output = auth.export("openai", format=ExportFormat.ENV)
         assert output == "Successfully exported credentials to environment."
-        assert os.environ["OPENAI_API_KEY"] == "sk-export"
+        assert os.environ["OPENAI_API_KEY"] == "sk-export-padded-for-regex"
 
     def test_export_json_format(self, auth: AuthLayer) -> None:
         auth.login("openai", input_provider=MockInputProvider({"api_key": "sk-json-padded-for-regex"}))

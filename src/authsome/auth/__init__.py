@@ -586,8 +586,18 @@ class AuthLayer:
                     if refreshed.access_token is None:
                         raise RefreshFailedError("Refreshed record missing access token", provider=provider)
                     return refreshed.access_token
-                except RefreshFailedError:
+                except RefreshFailedError as exc:
                     if now < record.expires_at:
+                        logger.warning(
+                            "Token refresh failed for provider={} connection={} profile={}: {}; "
+                            "using cached token until {}. Re-authenticate with: authsome login {}",
+                            provider,
+                            connection,
+                            self._identity,
+                            exc,
+                            record.expires_at.isoformat(),
+                            provider,
+                        )
                         return record.access_token
                     raise
             else:

@@ -8,6 +8,24 @@ from pydantic import BaseModel, Field
 
 from authsome.auth.models.enums import AuthType, FlowType
 
+#: Per-input requirement state. ``hidden`` means the field is not collected
+#: from the user at all (the provider doesn't need it).
+InputRequirement = Literal["required", "optional", "hidden"]
+
+
+class FlowConfig(BaseModel):
+    """Per-flow overrides on a provider definition.
+
+    Currently exposes one knob — ``inputs`` — which lets a provider declare
+    per-flow whether each credential field is ``required``, ``optional``, or
+    ``hidden``. Unset fields fall back to code-level defaults so providers
+    without this declaration keep behaving as before.
+    """
+
+    inputs: dict[str, InputRequirement] = Field(default_factory=dict)
+
+    model_config = {"extra": "allow"}
+
 
 class OAuthConfig(BaseModel):
     """OAuth2-specific provider configuration."""
@@ -24,6 +42,8 @@ class OAuthConfig(BaseModel):
     supports_dcr: bool = False
     registration_endpoint: str | None = None
     base_url: str | None = None
+    #: Per-flow overrides keyed by ``FlowType.value`` (e.g. ``"pkce"``, ``"device_code"``).
+    flows: dict[str, FlowConfig] = Field(default_factory=dict)
 
     model_config = {"extra": "allow"}
 
@@ -37,6 +57,8 @@ class ApiKeyConfig(BaseModel):
     key_pattern: str | None = None
     #: Optional human-readable hint shown when ``key_pattern`` does not match (e.g. "Keys start with 'sk-'.").
     key_pattern_hint: str | None = None
+    #: Per-input requirement overrides for the ``api_key`` flow.
+    inputs: dict[str, InputRequirement] = Field(default_factory=dict)
 
     model_config = {"extra": "allow"}
 

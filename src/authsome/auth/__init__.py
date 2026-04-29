@@ -29,7 +29,7 @@ from authsome.auth.models.connection import (
     ProviderStateRecord,
 )
 from authsome.auth.models.enums import AuthType, ConnectionStatus, ExportFormat, FlowType
-from authsome.auth.models.provider import ProviderDefinition
+from authsome.auth.models.provider import InputRequirement, ProviderDefinition
 from authsome.auth.providers.registry import ProviderRegistry
 from authsome.errors import (
     AuthsomeError,
@@ -228,10 +228,8 @@ class AuthLayer:
             )
 
         if flow_type in (FlowType.PKCE, FlowType.DEVICE_CODE, FlowType.DCR_PKCE):
-            if scopes is None and persisted_scopes is None:
-                default_scopes = (
-                    ",".join(definition.oauth.scopes) if definition.oauth and definition.oauth.scopes else ""
-                )
+            if scopes is None and persisted_scopes is None and definition.oauth and definition.oauth.scopes:
+                default_scopes = ",".join(definition.oauth.scopes)
                 fields_to_collect.append(
                     InputField(name="scopes", label="Scopes (comma-separated)", secret=False, default=default_scopes)
                 )
@@ -244,6 +242,9 @@ class AuthLayer:
             fields_to_collect.append(api_key_field)
 
         static_hints.extend(self._build_docs_hints(definition, flow_type))
+
+        overrides = self._get_input_overrides(definition, flow_type)
+        fields_to_collect = self._apply_input_overrides(fields_to_collect, overrides)
 
         if fields_to_collect:
             ip: InputProvider = input_provider or BridgeInputProvider(
@@ -279,6 +280,17 @@ class AuthLayer:
             scopes
             if scopes is not None
             else (client_record.scopes if client_record and client_record.scopes is not None else None)
+        )
+
+        self._validate_declared_required(
+            overrides,
+            provider=provider,
+            client_id=flow_client_id,
+            client_secret=flow_client_secret,
+            api_key=flow_api_key,
+            base_url=flow_base_url,
+            host_url=client_record.host_url if client_record else None,
+            scopes=final_scopes,
         )
 
         # Resolve URLs if base_url is present
@@ -326,6 +338,76 @@ class AuthLayer:
                 "url": definition.docs,
             }
         ]
+
+    @staticmethod
+    def _get_input_overrides(definition: ProviderDefinition, flow_type: FlowType) -> dict[str, InputRequirement]:
+        """Return per-flow input requirement overrides declared by the provider, if any."""
+        if flow_type == FlowType.API_KEY and definition.api_key:
+            return dict(definition.api_key.inputs)
+        if definition.oauth:
+            cfg = definition.oauth.flows.get(flow_type.value)
+            if cfg:
+                return dict(cfg.inputs)
+        return {}
+
+    @staticmethod
+    def _apply_input_overrides(fields: list[InputField], overrides: dict[str, InputRequirement]) -> list[InputField]:
+        """Apply provider-declared overrides to the default field list.
+
+        ``hidden`` removes the field entirely. ``required`` flips ``default``
+        to ``None`` (so ``BridgeInputProvider`` marks the input as required)
+        and strips any "(Optional)"-style hint from the label.
+        ``optional`` leaves the field in place but ensures ``default`` is a
+        non-``None`` string.
+        """
+        if not overrides:
+            return fields
+
+        clean_labels = {"client_id": "Client ID", "client_secret": "Client Secret", "api_key": "API Key"}
+        out: list[InputField] = []
+        for f in fields:
+            req = overrides.get(f.name)
+            if req == "hidden":
+                continue
+            if req == "required":
+                out.append(f.model_copy(update={"default": None, "label": clean_labels.get(f.name, f.label)}))
+            elif req == "optional" and f.default is None:
+                out.append(f.model_copy(update={"default": ""}))
+            else:
+                out.append(f)
+        return out
+
+    @staticmethod
+    def _validate_declared_required(
+        overrides: dict[str, InputRequirement],
+        *,
+        provider: str,
+        client_id: str | None,
+        client_secret: str | None,
+        api_key: str | None,
+        base_url: str | None,
+        host_url: str | None,
+        scopes: list[str] | None,
+    ) -> None:
+        """Raise if any explicitly-declared ``required`` field has no final value.
+
+        Catches non-bridge paths (mock, programmatic, interactive) where the
+        HTML ``required`` attribute can't enforce non-emptiness.
+        """
+        finals: dict[str, Any] = {
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "api_key": api_key,
+            "base_url": base_url,
+            "host_url": host_url,
+            "scopes": scopes,
+        }
+        for name, req in overrides.items():
+            if req != "required":
+                continue
+            value = finals.get(name)
+            if value is None or (isinstance(value, str) and not value.strip()) or value == []:
+                raise AuthsomeError(f"Missing required field for provider '{provider}': {name}")
 
     # ── Token operations ──────────────────────────────────────────────────
 

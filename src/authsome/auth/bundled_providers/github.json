@@ -16,7 +16,21 @@
     ],
     "pkce": true,
     "supports_device_flow": true,
-    "supports_dcr": false
+    "supports_dcr": false,
+    "flows": {
+      "pkce": {
+        "inputs": {
+          "client_id": "required",
+          "client_secret": "required"
+        }
+      },
+      "device_code": {
+        "inputs": {
+          "client_id": "required",
+          "client_secret": "hidden"
+        }
+      }
+    }
   },
   "host_url": "api.github.com",
   "export": {

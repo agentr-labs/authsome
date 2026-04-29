@@ -674,6 +674,7 @@ def ui(ctx_obj: ContextObj, port: int) -> None:
     # Ensure context is initialized so doctor runs and vault gets set up if needed
     ctx_obj.initialize()
     from authsome.ui.server import serve_dashboard
+
     serve_dashboard(port=port)
 
 

@@ -95,7 +95,7 @@ def serve_dashboard(port: int = 8000) -> None:
                     self.send_response(500)
                     self.send_header("Content-type", "text/plain")
                     self.end_headers()
-                    self.wfile.write(f"Internal Server Error: {str(e)}".encode("utf-8"))
+                    self.wfile.write(f"Internal Server Error: {str(e)}".encode())
 
             elif self.path == "/style.css":
                 css_path = static_dir / "style.css"

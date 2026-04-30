@@ -546,9 +546,9 @@ def test_whoami(runner, mock_ctx, tmp_path):
     result = runner.invoke(cli, ["whoami"])
     assert result.exit_code == 0
     assert str(tmp_path) in result.output
-    assert "Active Profile: default" in result.output
+    assert "Active Profile:    default" in result.output
     assert "Authsome Version:" in result.output
-    assert "local_key" in result.output  # default encryption mode
+    assert "Encryption:        Local File" in result.output  # default encryption mode
     assert "Connected Providers: 2" in result.output
     assert "github" in result.output
     assert "openai" in result.output
@@ -578,10 +578,11 @@ def test_whoami_with_config(runner, mock_ctx, tmp_path):
     result = runner.invoke(cli, ["whoami", "--json"])
     assert result.exit_code == 0
     data = json.loads(result.output)
-    assert data["encryption_mode"] == "keyring"
+    assert data["encryption_backend"] == "OS Keyring"
     assert data["active_profile"] == "work"
     assert data["connected_providers_count"] == 1
-    assert data["connected_providers"] == ["openai"]
+    assert data["connected_providers"][0]["name"] == "openai"
+    assert data["connected_providers"][0]["count"] == 1
     assert "authsome_version" in data
 
 

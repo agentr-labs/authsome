@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
+import requests
 from click.testing import CliRunner
 
 from authsome.auth.models.enums import ExportFormat
@@ -654,7 +655,9 @@ def test_register_localhost_fails(runner, mock_ctx):
     assert "cannot be localhost" in result.output
 
 
-def test_register_unreachable_warns(runner, mock_ctx):
+@patch("requests.head")
+def test_register_unreachable_warns(mock_head, runner, mock_ctx):
+    mock_head.side_effect = requests.RequestException("Mocked timeout")
     f = "tests/test_providers/test_unreachable.json"
     # Provide input 'y' to confirm registration
     result = runner.invoke(cli, ["register", f], input="y\n")
@@ -663,7 +666,9 @@ def test_register_unreachable_warns(runner, mock_ctx):
     mock_ctx.auth.register_provider.assert_called_once()
 
 
-def test_register_valid_success(runner, mock_ctx):
+@patch("requests.head")
+def test_register_valid_success(mock_head, runner, mock_ctx):
+    mock_head.return_value.status_code = 200
     f = "tests/test_providers/test_valid.json"
     result = runner.invoke(cli, ["register", f], input="y\n")
     assert result.exit_code == 0

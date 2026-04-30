@@ -464,12 +464,23 @@ def get(ctx_obj: ContextObj, provider: str, connection: str, field: str | None, 
     record = actx.auth.get_connection(provider, connection)
 
     if show_secret:
+        from authsome.utils import require_os_auth
+
+        if not require_os_auth("reveal secrets"):
+            ctx_obj.echo("Authentication failed or cancelled.", err=True, color="red")
+            sys.exit(1)
         audit.log("get", provider=provider, connection=connection, field=field or "all")
 
     data = redact(record) if not show_secret else record.model_dump(mode="json")
 
     if field:
         if field in data:
+            if show_secret:
+                ctx_obj.echo(
+                    "WARNING: Secret printed to stdout. Run: history -d <n> to remove from shell history.",
+                    err=True,
+                    color="yellow",
+                )
             if ctx_obj.json_output:
                 ctx_obj.print_json({field: data[field]})
             else:
@@ -478,6 +489,13 @@ def get(ctx_obj: ContextObj, provider: str, connection: str, field: str | None, 
             ctx_obj.echo(f"Field '{field}' not found.", err=True, color="red")
             sys.exit(1)
         return
+
+    if show_secret:
+        ctx_obj.echo(
+            "WARNING: Secret printed to stdout. Run: history -d <n> to remove from shell history.",
+            err=True,
+            color="yellow",
+        )
 
     if ctx_obj.json_output:
         ctx_obj.print_json(data)

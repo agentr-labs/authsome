@@ -103,7 +103,7 @@ authsome run curl https://api.github.com/user
 authsome run python my_agent.py
 
 # Legacy/Explicit export (if proxy is not supported by your tool)
-authsome export github --format env
+export $(authsome export github)
 ```
 
 ---

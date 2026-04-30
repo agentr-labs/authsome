@@ -8,7 +8,6 @@ Does not touch encryption directly — all persistence goes through the Vault.
 from __future__ import annotations
 
 import json
-import os
 import re
 from dataclasses import dataclass
 from datetime import timedelta
@@ -479,8 +478,17 @@ class AuthLayer:
     # ── Export operations ─────────────────────────────────────────────────
 
     def export(
-        self, provider: str | None = None, connection: str = "default", format: ExportFormat = ExportFormat.ENV
+        self,
+        provider: str | None = None,
+        connection: str = "default",
+        format: ExportFormat = ExportFormat.ENV,
     ) -> str:
+        """Export credential material in selected format."""
+        values = self.get_export_values(provider, connection)
+        return self._format_export_values(values, format)
+
+    def get_export_values(self, provider: str | None = None, connection: str = "default") -> dict[str, str]:
+        """Return a dictionary of exportable credential values."""
         if provider is None:
             values: dict[str, str] = {}
             for provider_record in self.list_connections():
@@ -491,10 +499,9 @@ class AuthLayer:
                         if env_name in values:
                             env_name = self._disambiguate_export_name(env_name, provider_name, connection_name, values)
                         values[env_name] = env_value
-            return self._format_export_values(values, format)
+            return values
 
-        values = self._export_connection_values(provider, connection)
-        return self._format_export_values(values, format)
+        return self._export_connection_values(provider, connection)
 
     def _export_connection_values(self, provider: str, connection: str) -> dict[str, str]:
         definition = self.get_provider(provider)
@@ -504,23 +511,24 @@ class AuthLayer:
 
         if record.auth_type == AuthType.OAUTH2:
             if record.access_token:
-                env_name = export_map.get("access_token", f"{provider.upper()}_ACCESS_TOKEN")
+                env_name = export_map.get("access_token", f"{self._export_name_part(provider)}_ACCESS_TOKEN")
                 values[env_name] = record.access_token
             if record.refresh_token:
-                env_name = export_map.get("refresh_token", f"{provider.upper()}_REFRESH_TOKEN")
+                env_name = export_map.get("refresh_token", f"{self._export_name_part(provider)}_REFRESH_TOKEN")
                 values[env_name] = record.refresh_token
         elif record.auth_type == AuthType.API_KEY:
             if record.api_key:
-                env_name = export_map.get("api_key", f"{provider.upper()}_API_KEY")
+                env_name = export_map.get("api_key", f"{self._export_name_part(provider)}_API_KEY")
                 values[env_name] = record.api_key
 
         return values
 
     def _format_export_values(self, values: dict[str, str], format: ExportFormat) -> str:
         if format == ExportFormat.ENV:
-            os.environ.update(values)
-            return "Successfully exported credentials to environment."
-        elif format == ExportFormat.JSON:
+            return "\n".join(f"{k}={v}" for k, v in values.items())
+        if format == ExportFormat.SHELL:
+            return "\n".join(f"export {k}={v}" for k, v in values.items())
+        if format == ExportFormat.JSON:
             return json.dumps(values, indent=2)
         return ""
 

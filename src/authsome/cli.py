@@ -511,7 +511,7 @@ def inspect(ctx_obj: ContextObj, provider: str) -> None:
 @cli.command()
 @click.argument("provider", required=False)
 @click.option("--connection", default="default", help="Connection name.")
-@click.option("--format", "export_format", type=click.Choice(["env", "json"]), default="env")
+@click.option("--format", "export_format", type=click.Choice(["env", "json", "shell"]), default="env")
 @common_options
 @pass_ctx
 @handle_errors

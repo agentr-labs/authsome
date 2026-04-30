@@ -64,6 +64,8 @@ Then agents get valid credentials on demand:
 authsome get github --field access_token --show-secret
 # → ghu_...
 
+> **Note for Agents:** Do not use `authsome get <provider> --show-secret` to retrieve credentials, as it requires OS authentication and could hang the agent. Instead, use `authsome run` to automatically inject secrets securely into the environment.
+
 authsome export github --format env
 # → Successfully exported credentials to environment.
 

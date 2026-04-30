@@ -84,5 +84,3 @@ profile:<profile>:<provider>:state
 `ClientConfig` supports `env:VAR_NAME` syntax so client credentials can come from environment variables without hardcoding them in the provider JSON.
 
 **CLI (`src/authsome/cli.py`)** is Click-based. All commands support `--json` for machine-readable output.
-
-> **Note for Agents:** Do not use `authsome get <provider> --show-secret` to retrieve credentials, as it requires OS authentication and could hang the agent. Instead, use `authsome run -- <your_command>` to automatically inject secrets securely into the environment.

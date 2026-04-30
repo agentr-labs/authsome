@@ -1,13 +1,17 @@
 """Command-line interface for authsome."""
 
 import functools
+import ipaddress
 import json as json_lib
+import pathlib
 import sys
+import urllib.parse
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import click
+import requests
 from loguru import logger
 
 from authsome import __version__, audit
@@ -186,9 +190,6 @@ def _validate_provider_endpoints(definition: Any, ctx_obj: ContextObj) -> list[t
             endpoints_to_check.append(("registration_endpoint", definition.oauth.registration_endpoint, False))
     if definition.host_url:
         endpoints_to_check.append(("host_url", definition.host_url, True))
-
-    import ipaddress
-    import urllib.parse
 
     for name, val, is_host in endpoints_to_check:
         if "://" in val:
@@ -590,7 +591,6 @@ def run(ctx_obj: ContextObj, command: tuple[str]) -> None:
 @handle_errors
 def register(ctx_obj: ContextObj, path: str, force: bool) -> None:
     """Register a provider definition from a local JSON file path."""
-    import pathlib
 
     actx = ctx_obj.initialize()
     filepath = pathlib.Path(path)
@@ -635,7 +635,6 @@ def register(ctx_obj: ContextObj, path: str, force: bool) -> None:
             ctx_obj.echo(f"Provider {definition.name} registered.", color="green")
 
         # 4. Post-registration connectivity check
-        import requests
 
         warnings = []
         for name, val, is_host in endpoints_to_check:

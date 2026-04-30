@@ -504,7 +504,7 @@ def test_register_success(runner, mock_ctx, tmp_path):
         )
     )
 
-    result = runner.invoke(cli, ["register", str(f)])
+    result = runner.invoke(cli, ["register", str(f)], input="y\n")
     assert result.exit_code == 0
     mock_ctx.auth.register_provider.assert_called_once()
 
@@ -638,3 +638,34 @@ def test_echo_quiet(runner, mock_ctx):
     result = runner.invoke(cli, ["logout", "openai", "--quiet"])
     assert result.exit_code == 0
     assert "Logged out" not in result.output
+
+
+def test_register_http_fails(runner, mock_ctx):
+    f = "tests/test_providers/test_http.json"
+    result = runner.invoke(cli, ["register", f])
+    assert result.exit_code == 1
+    assert "must use HTTPS scheme" in result.output
+
+
+def test_register_localhost_fails(runner, mock_ctx):
+    f = "tests/test_providers/test_localhost.json"
+    result = runner.invoke(cli, ["register", f])
+    assert result.exit_code == 1
+    assert "cannot be localhost" in result.output
+
+
+def test_register_unreachable_warns(runner, mock_ctx):
+    f = "tests/test_providers/test_unreachable.json"
+    # Provide input 'y' to confirm registration
+    result = runner.invoke(cli, ["register", f], input="y\n")
+    assert result.exit_code == 0
+    assert "is unreachable:" in result.output
+    mock_ctx.auth.register_provider.assert_called_once()
+
+
+def test_register_valid_success(runner, mock_ctx):
+    f = "tests/test_providers/test_valid.json"
+    result = runner.invoke(cli, ["register", f], input="y\n")
+    assert result.exit_code == 0
+    assert "is unreachable:" not in result.output
+    mock_ctx.auth.register_provider.assert_called_once()

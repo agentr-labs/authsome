@@ -170,6 +170,51 @@ def _format_duration(total_seconds: int) -> str:
     return f"{days}d"
 
 
+def _validate_provider_endpoints(definition: Any, ctx_obj: ContextObj) -> list[tuple[str, str, bool]]:
+    """Extract and validate provider endpoints for security."""
+    endpoints_to_check: list[tuple[str, str, bool]] = []
+    if definition.oauth:
+        if definition.oauth.authorization_url:
+            endpoints_to_check.append(("authorization_url", definition.oauth.authorization_url, False))
+        if definition.oauth.token_url:
+            endpoints_to_check.append(("token_url", definition.oauth.token_url, False))
+        if definition.oauth.revocation_url:
+            endpoints_to_check.append(("revocation_url", definition.oauth.revocation_url, False))
+        if definition.oauth.device_authorization_url:
+            endpoints_to_check.append(("device_authorization_url", definition.oauth.device_authorization_url, False))
+        if definition.oauth.registration_endpoint:
+            endpoints_to_check.append(("registration_endpoint", definition.oauth.registration_endpoint, False))
+    if definition.host_url:
+        endpoints_to_check.append(("host_url", definition.host_url, True))
+
+    import ipaddress
+    import urllib.parse
+
+    for name, val, is_host in endpoints_to_check:
+        if "://" in val:
+            parsed = urllib.parse.urlparse(val)
+            if parsed.scheme != "https":
+                ctx_obj.echo(f"Error: {name} must use HTTPS scheme ({val})", err=True, color="red")
+                sys.exit(1)
+            host = parsed.hostname
+        else:
+            host = val
+
+        if host in ("localhost", "127.0.0.1", "::1"):
+            ctx_obj.echo(f"Error: {name} cannot be localhost ({val})", err=True, color="red")
+            sys.exit(1)
+
+        if host:
+            try:
+                ipaddress.ip_address(host)
+                ctx_obj.echo(f"Error: {name} cannot be a bare IP address ({val})", err=True, color="red")
+                sys.exit(1)
+            except ValueError:
+                pass
+
+    return endpoints_to_check
+
+
 @click.group()
 @click.version_option(__version__, "-v", "--version")
 @click.option("--verbose", is_flag=True, default=False, help="Enable DEBUG logging to stderr.")
@@ -558,24 +603,60 @@ def register(ctx_obj: ContextObj, path: str, force: bool) -> None:
         from authsome.auth.models.provider import ProviderDefinition
 
         definition = ProviderDefinition.model_validate(data)
+
+        # 1. Extract and validate endpoints
+        endpoints_to_check = _validate_provider_endpoints(definition, ctx_obj)
+
+        # 3. Confirmation prompt
+        if not ctx_obj.json_output and not ctx_obj.quiet and not force:
+            ctx_obj.echo(f"Registering '{definition.name}' provider:")
+            for name, val, _ in endpoints_to_check:
+                ctx_obj.echo(f"  - {name}: {val}")
+
+            if definition.oauth and definition.oauth.token_url:
+                prompt_msg = f"Register '{definition.name}' with token endpoint {definition.oauth.token_url}? [y/N]"
+            elif definition.host_url:
+                prompt_msg = f"Register '{definition.name}' with host {definition.host_url}? [y/N]"
+            else:
+                prompt_msg = f"Register '{definition.name}' provider? [y/N]"
+
+            if not click.confirm(prompt_msg, default=False):
+                ctx_obj.echo("Registration aborted.", color="yellow")
+                sys.exit(0)
+
         actx.auth.register_provider(definition, force=force)
 
-        endpoints = [
-            ep
-            for ep in [
-                definition.oauth.authorization_url if definition.oauth else None,
-                definition.oauth.token_url if definition.oauth else None,
-                definition.oauth.revocation_url if definition.oauth else None,
-                definition.host_url,
-            ]
-            if ep
-        ]
+        endpoints = [ep for _, ep, _ in endpoints_to_check]
         audit.log("register", provider=definition.name, endpoints=endpoints)
 
         if ctx_obj.json_output:
             ctx_obj.print_json({"status": "registered", "provider": definition.name})
         else:
             ctx_obj.echo(f"Provider {definition.name} registered.", color="green")
+
+        # 4. Post-registration connectivity check
+        import requests
+
+        warnings = []
+        for name, val, is_host in endpoints_to_check:
+            if name not in ("host_url", "authorization_url"):
+                continue
+
+            target = val
+            if is_host and "://" not in target:
+                target = f"https://{target}"
+
+            if not ctx_obj.quiet:
+                ctx_obj.echo(f"Testing reachability for {name}...", color="cyan")
+            try:
+                requests.head(target, timeout=5, allow_redirects=True)
+            except requests.RequestException as e:
+                warnings.append(f"{name} ({val}) is unreachable: {e}")
+
+        if warnings and not ctx_obj.quiet:
+            for w in warnings:
+                ctx_obj.echo(f"Warning: {w}", color="yellow")
+
     except Exception as exc:
         ctx_obj.echo(f"Failed to register provider: {exc}", err=True, color="red")
         sys.exit(1)

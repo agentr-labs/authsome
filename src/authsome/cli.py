@@ -702,35 +702,58 @@ def whoami(ctx_obj: ContextObj) -> None:
         except Exception:
             pass
 
+    # Basic health check
+    doctor_results = actx.doctor()
+    vault_status = "OK" if (doctor_results.get("encryption") and doctor_results.get("store")) else "ERROR"
+
+    # Encryption details
+    enc_mode = config.encryption.mode if config.encryption else "local_key"
+    if enc_mode == "local_key":
+        enc_desc = f"Local File ({home / 'master.key'})"
+    elif enc_mode == "keyring":
+        enc_desc = "OS Keyring"
+    else:
+        enc_desc = enc_mode
+
+    # Connected providers with counts
+    connected_providers = []
+    for provider_group in actx.auth.list_connections():
+        active_conns = [c["connection_name"] for c in provider_group["connections"] if connection_is_active(c)]
+        if active_conns:
+            connected_providers.append(
+                {
+                    "name": provider_group["name"],
+                    "count": len(active_conns),
+                    "connections": active_conns,
+                }
+            )
+
     data = {
+        "authsome_version": __version__,
         "home_directory": str(home),
         "active_profile": actx.auth.identity,
-        "authsome_version": __version__,
-        "encryption_mode": config.encryption.mode if config.encryption else "local_key",
-        "connected_providers_count": 0,
-        "connected_providers": [],
+        "encryption_backend": enc_desc,
+        "vault_status": vault_status,
+        "connected_providers_count": len(connected_providers),
+        "connected_providers": connected_providers,
     }
-    connected_providers = sorted(
-        {
-            provider_group["name"]
-            for provider_group in actx.auth.list_connections()
-            if any(connection_is_active(connection) for connection in provider_group["connections"])
-        }
-    )
-    data["connected_providers_count"] = len(connected_providers)
-    data["connected_providers"] = connected_providers
 
     if ctx_obj.json_output:
         ctx_obj.print_json(data)
     else:
-        ctx_obj.echo(f"Home Directory: {data['home_directory']}")
-        ctx_obj.echo(f"Active Profile: {data['active_profile']}")
-        ctx_obj.echo(f"Authsome Version: {data['authsome_version']}")
-        ctx_obj.echo(f"Encryption Mode: {data['encryption_mode']}")
-        ctx_obj.echo(f"Connected Providers: {data['connected_providers_count']}")
+        ctx_obj.echo(f"Authsome Version:  {data['authsome_version']}")
+        ctx_obj.echo(f"Home Directory:    {data['home_directory']}")
+        ctx_obj.echo(f"Active Profile:    {data['active_profile']}")
+        status_color = "green" if vault_status == "OK" else "red"
+        ctx_obj.echo(f"Encryption:        {data['encryption_backend']} [", nl=False)
+        ctx_obj.echo(vault_status, color=status_color, nl=False)
+        ctx_obj.echo("]")
+
+        ctx_obj.echo(f"\nConnected Providers: {data['connected_providers_count']}")
         if connected_providers:
-            for provider in connected_providers:
-                ctx_obj.echo(f"  {provider}")
+            for p in sorted(connected_providers, key=lambda x: x["name"]):
+                suffix = "connection" if p["count"] == 1 else "connections"
+                ctx_obj.echo(f"  {p['name']} ({p['count']} {suffix})")
 
 
 @cli.command()

@@ -713,9 +713,7 @@ def test_echo_quiet(runner, mock_ctx):
     ],
 )
 @patch("requests.head")
-def test_register_scenarios(
-    mock_head, runner, mock_ctx, tmp_path, provider_data, expected_exit_code, expected_output
-):
+def test_register_scenarios(mock_head, runner, mock_ctx, tmp_path, provider_data, expected_exit_code, expected_output):
     if provider_data["name"] == "test_valid":
         mock_head.return_value.status_code = 200
     else:

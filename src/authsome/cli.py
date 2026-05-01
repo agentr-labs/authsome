@@ -1,13 +1,17 @@
 """Command-line interface for authsome."""
 
 import functools
+import ipaddress
 import json as json_lib
+import pathlib
 import sys
+import urllib.parse
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import click
+import requests
 from loguru import logger
 
 from authsome import __version__, audit
@@ -80,6 +84,8 @@ def format_error_code(exc: Exception) -> int:
         return 4
     if exc_name == "CredentialMissingError":
         return 5
+    if exc_name == "InputCancelledError":
+        return 4
     if exc_name == "RefreshFailedError":
         return 6
     if exc_name == "StoreUnavailableError":
@@ -168,6 +174,48 @@ def _format_duration(total_seconds: int) -> str:
         return f"{hours}h"
     days = hours // 24
     return f"{days}d"
+
+
+def _validate_provider_endpoints(definition: Any, ctx_obj: ContextObj) -> list[tuple[str, str, bool]]:
+    """Extract and validate provider endpoints for security."""
+    endpoints_to_check: list[tuple[str, str, bool]] = []
+    if definition.oauth:
+        if definition.oauth.authorization_url:
+            endpoints_to_check.append(("authorization_url", definition.oauth.authorization_url, False))
+        if definition.oauth.token_url:
+            endpoints_to_check.append(("token_url", definition.oauth.token_url, False))
+        if definition.oauth.revocation_url:
+            endpoints_to_check.append(("revocation_url", definition.oauth.revocation_url, False))
+        if definition.oauth.device_authorization_url:
+            endpoints_to_check.append(("device_authorization_url", definition.oauth.device_authorization_url, False))
+        if definition.oauth.registration_endpoint:
+            endpoints_to_check.append(("registration_endpoint", definition.oauth.registration_endpoint, False))
+    if definition.host_url:
+        endpoints_to_check.append(("host_url", definition.host_url, True))
+
+    for name, val, is_host in endpoints_to_check:
+        if "://" in val:
+            parsed = urllib.parse.urlparse(val)
+            if parsed.scheme != "https":
+                ctx_obj.echo(f"Error: {name} must use HTTPS scheme ({val})", err=True, color="red")
+                sys.exit(1)
+            host = parsed.hostname
+        else:
+            host = val
+
+        if host in ("localhost", "127.0.0.1", "::1"):
+            ctx_obj.echo(f"Error: {name} cannot be localhost ({val})", err=True, color="red")
+            sys.exit(1)
+
+        if host:
+            try:
+                ipaddress.ip_address(host)
+                ctx_obj.echo(f"Error: {name} cannot be a bare IP address ({val})", err=True, color="red")
+                sys.exit(1)
+            except ValueError:
+                pass
+
+    return endpoints_to_check
 
 
 @click.group()
@@ -464,12 +512,23 @@ def get(ctx_obj: ContextObj, provider: str, connection: str, field: str | None, 
     record = actx.auth.get_connection(provider, connection)
 
     if show_secret:
+        from authsome.utils import require_os_auth
+
+        if not require_os_auth("reveal secrets"):
+            ctx_obj.echo("Authentication failed or cancelled.", err=True, color="red")
+            sys.exit(1)
         audit.log("get", provider=provider, connection=connection, field=field or "all")
 
     data = redact(record) if not show_secret else record.model_dump(mode="json")
 
     if field:
         if field in data:
+            if show_secret:
+                ctx_obj.echo(
+                    "WARNING: Secret printed to stdout. Run: history -d <n> to remove from shell history.",
+                    err=True,
+                    color="yellow",
+                )
             if ctx_obj.json_output:
                 ctx_obj.print_json({field: data[field]})
             else:
@@ -478,6 +537,13 @@ def get(ctx_obj: ContextObj, provider: str, connection: str, field: str | None, 
             ctx_obj.echo(f"Field '{field}' not found.", err=True, color="red")
             sys.exit(1)
         return
+
+    if show_secret:
+        ctx_obj.echo(
+            "WARNING: Secret printed to stdout. Run: history -d <n> to remove from shell history.",
+            err=True,
+            color="yellow",
+        )
 
     if ctx_obj.json_output:
         ctx_obj.print_json(data)
@@ -517,6 +583,11 @@ def inspect(ctx_obj: ContextObj, provider: str) -> None:
 @handle_errors
 def export(ctx_obj: ContextObj, provider: str | None, connection: str, export_format: str) -> None:
     """Export credential material in selected format."""
+    ctx_obj.echo(
+        "Note: secrets are now in your shell environment for this session. Prefer 'authsome run' for scoped injection.",
+        err=True,
+        color="yellow",
+    )
     actx = ctx_obj.initialize()
     fmt = ExportFormat(export_format)
     output = actx.auth.export(provider, connection, format=fmt)
@@ -545,7 +616,6 @@ def run(ctx_obj: ContextObj, command: tuple[str]) -> None:
 @handle_errors
 def register(ctx_obj: ContextObj, path: str, force: bool) -> None:
     """Register a provider definition from a local JSON file path."""
-    import pathlib
 
     actx = ctx_obj.initialize()
     filepath = pathlib.Path(path)
@@ -558,24 +628,59 @@ def register(ctx_obj: ContextObj, path: str, force: bool) -> None:
         from authsome.auth.models.provider import ProviderDefinition
 
         definition = ProviderDefinition.model_validate(data)
+
+        # 1. Extract and validate endpoints
+        endpoints_to_check = _validate_provider_endpoints(definition, ctx_obj)
+
+        # 3. Confirmation prompt
+        if not ctx_obj.json_output and not ctx_obj.quiet and not force:
+            ctx_obj.echo(f"Registering '{definition.name}' provider:")
+            for name, val, _ in endpoints_to_check:
+                ctx_obj.echo(f"  - {name}: {val}")
+
+            if definition.oauth and definition.oauth.token_url:
+                prompt_msg = f"Register '{definition.name}' with token endpoint {definition.oauth.token_url}? [y/N]"
+            elif definition.host_url:
+                prompt_msg = f"Register '{definition.name}' with host {definition.host_url}? [y/N]"
+            else:
+                prompt_msg = f"Register '{definition.name}' provider? [y/N]"
+
+            if not click.confirm(prompt_msg, default=False):
+                ctx_obj.echo("Registration aborted.", color="yellow")
+                sys.exit(0)
+
         actx.auth.register_provider(definition, force=force)
 
-        endpoints = [
-            ep
-            for ep in [
-                definition.oauth.authorization_url if definition.oauth else None,
-                definition.oauth.token_url if definition.oauth else None,
-                definition.oauth.revocation_url if definition.oauth else None,
-                definition.host_url,
-            ]
-            if ep
-        ]
+        endpoints = [ep for _, ep, _ in endpoints_to_check]
         audit.log("register", provider=definition.name, endpoints=endpoints)
 
         if ctx_obj.json_output:
             ctx_obj.print_json({"status": "registered", "provider": definition.name})
         else:
             ctx_obj.echo(f"Provider {definition.name} registered.", color="green")
+
+        # 4. Post-registration connectivity check
+
+        warnings = []
+        for name, val, is_host in endpoints_to_check:
+            if name not in ("host_url", "authorization_url"):
+                continue
+
+            target = val
+            if is_host and "://" not in target:
+                target = f"https://{target}"
+
+            if not ctx_obj.quiet:
+                ctx_obj.echo(f"Testing reachability for {name}...", color="cyan")
+            try:
+                requests.head(target, timeout=5, allow_redirects=True)
+            except requests.RequestException as e:
+                warnings.append(f"{name} ({val}) is unreachable: {e}")
+
+        if warnings and not ctx_obj.quiet:
+            for w in warnings:
+                ctx_obj.echo(f"Warning: {w}", color="yellow")
+
     except Exception as exc:
         ctx_obj.echo(f"Failed to register provider: {exc}", err=True, color="red")
         sys.exit(1)
@@ -599,35 +704,58 @@ def whoami(ctx_obj: ContextObj) -> None:
         except Exception:
             pass
 
+    # Basic health check
+    doctor_results = actx.doctor()
+    vault_status = "OK" if (doctor_results.get("encryption") and doctor_results.get("store")) else "ERROR"
+
+    # Encryption details
+    enc_mode = config.encryption.mode if config.encryption else "local_key"
+    if enc_mode == "local_key":
+        enc_desc = f"Local File ({home / 'master.key'})"
+    elif enc_mode == "keyring":
+        enc_desc = "OS Keyring"
+    else:
+        enc_desc = enc_mode
+
+    # Connected providers with counts
+    connected_providers = []
+    for provider_group in actx.auth.list_connections():
+        active_conns = [c["connection_name"] for c in provider_group["connections"] if connection_is_active(c)]
+        if active_conns:
+            connected_providers.append(
+                {
+                    "name": provider_group["name"],
+                    "count": len(active_conns),
+                    "connections": active_conns,
+                }
+            )
+
     data = {
+        "authsome_version": __version__,
         "home_directory": str(home),
         "active_profile": actx.auth.identity,
-        "authsome_version": __version__,
-        "encryption_mode": config.encryption.mode if config.encryption else "local_key",
-        "connected_providers_count": 0,
-        "connected_providers": [],
+        "encryption_backend": enc_desc,
+        "vault_status": vault_status,
+        "connected_providers_count": len(connected_providers),
+        "connected_providers": connected_providers,
     }
-    connected_providers = sorted(
-        {
-            provider_group["name"]
-            for provider_group in actx.auth.list_connections()
-            if any(connection_is_active(connection) for connection in provider_group["connections"])
-        }
-    )
-    data["connected_providers_count"] = len(connected_providers)
-    data["connected_providers"] = connected_providers
 
     if ctx_obj.json_output:
         ctx_obj.print_json(data)
     else:
-        ctx_obj.echo(f"Home Directory: {data['home_directory']}")
-        ctx_obj.echo(f"Active Profile: {data['active_profile']}")
-        ctx_obj.echo(f"Authsome Version: {data['authsome_version']}")
-        ctx_obj.echo(f"Encryption Mode: {data['encryption_mode']}")
-        ctx_obj.echo(f"Connected Providers: {data['connected_providers_count']}")
+        ctx_obj.echo(f"Authsome Version:  {data['authsome_version']}")
+        ctx_obj.echo(f"Home Directory:    {data['home_directory']}")
+        ctx_obj.echo(f"Active Profile:    {data['active_profile']}")
+        status_color = "green" if vault_status == "OK" else "red"
+        ctx_obj.echo(f"Encryption:        {data['encryption_backend']} [", nl=False)
+        ctx_obj.echo(vault_status, color=status_color, nl=False)
+        ctx_obj.echo("]")
+
+        ctx_obj.echo(f"\nConnected Providers: {data['connected_providers_count']}")
         if connected_providers:
-            for provider in connected_providers:
-                ctx_obj.echo(f"  {provider}")
+            for p in sorted(connected_providers, key=lambda x: x["name"]):
+                suffix = "connection" if p["count"] == 1 else "connections"
+                ctx_obj.echo(f"  {p['name']} ({p['count']} {suffix})")
 
 
 @cli.command()

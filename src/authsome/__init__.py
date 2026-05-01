@@ -29,6 +29,7 @@ from authsome.errors import (
     CredentialMissingError,
     DiscoveryError,
     EncryptionUnavailableError,
+    InputCancelledError,
     InvalidProviderSchemaError,
     ProfileNotFoundError,
     ProviderNotFoundError,
@@ -42,7 +43,7 @@ from authsome.vault import Vault
 
 _logger.disable("authsome")
 
-__version__ = "0.2.1"
+__version__ = "0.2.2"
 
 __all__ = [
     # Core
@@ -64,6 +65,7 @@ __all__ = [
     "CredentialMissingError",
     "DiscoveryError",
     "EncryptionUnavailableError",
+    "InputCancelledError",
     "InvalidProviderSchemaError",
     "ProfileNotFoundError",
     "ProviderNotFoundError",

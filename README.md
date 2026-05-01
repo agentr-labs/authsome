@@ -23,7 +23,7 @@ Log in once via OAuth2/API Key. Authsome keeps the credentials fresh for every A
 
 ## Demo
 
-<video src="docs/demo.mp4" controls width="100%"></video>
+<video src="https://github.com/manojbajaj95/authsome/releases/download/authsome-v0.2.2/demo.mp4" controls width="100%"></video>
 
 ---
 

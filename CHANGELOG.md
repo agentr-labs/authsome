@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.4](https://github.com/manojbajaj95/authsome/compare/authsome-v0.2.3...authsome-v0.2.4) (2026-05-02)
+
+
+### Documentation
+
+* use GitHub user-attachments URL for demo video ([a74f16f](https://github.com/manojbajaj95/authsome/commit/a74f16f1ef4c6e9b2abb62e68aa1cd4bcb0b08d7))
+
 ## [0.2.3](https://github.com/manojbajaj95/authsome/compare/authsome-v0.2.2...authsome-v0.2.3) (2026-05-01)
 
 
